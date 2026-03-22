@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
@@ -15,12 +14,11 @@ import { Input } from "@/components/ui/input"
 import { 
   FileText, 
   Search, 
-  ArrowUpDown,
   Download,
   Loader2,
-  FileCode,
   Eye,
-  Printer
+  FileCode,
+  ArrowUpDown
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -69,9 +67,10 @@ export default function InvoicesPage() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Faktura_${invoiceNumber}.pdf`);
+      pdf.save(`Faktura_${invoiceNumber.replace(/\//g, '_')}.pdf`);
       toast({ title: "Sukces", description: "Faktura została pobrana jako PDF." });
     } catch (err) {
+      console.error(err);
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się wygenerować PDF." });
     } finally {
       setIsExporting(false);
@@ -81,11 +80,10 @@ export default function InvoicesPage() {
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
       const searchStr = searchQuery.toLowerCase()
-      return (
-        inv.invoiceNumber?.toLowerCase().includes(searchStr) || 
-        inv.sellerName?.toLowerCase().includes(searchStr) ||
-        inv.buyerName?.toLowerCase().includes(searchStr)
-      )
+      const sName = (inv.sellerName || inv.seller?.name || "").toLowerCase();
+      const bName = (inv.buyerName || "").toLowerCase();
+      const iNum = (inv.invoiceNumber || "").toLowerCase();
+      return iNum.includes(searchStr) || sName.includes(searchStr) || bName.includes(searchStr);
     })
   }, [searchQuery, invoices])
 
@@ -119,7 +117,7 @@ export default function InvoicesPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
         <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        <p className="text-muted-foreground">Inicjalizacja bazy faktur...</p>
+        <p className="text-muted-foreground">Ładowanie bazy faktur...</p>
       </div>
     )
   }
@@ -130,7 +128,7 @@ export default function InvoicesPage() {
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Szukaj dokumentu..." 
+            placeholder="Szukaj po numerze lub nazwie..." 
             className="pl-10 bg-white border-none shadow-sm"
             value={searchQuery}
             onChange={(e) => {
@@ -139,8 +137,8 @@ export default function InvoicesPage() {
             }}
           />
         </div>
-        <div className="text-sm font-medium bg-white px-3 py-1 rounded-full shadow-sm text-primary">
-          Łącznie dokumentów: {invoices.length}
+        <div className="flex items-center gap-2">
+           <Badge variant="secondary" className="px-3 py-1 text-sm">{invoices.length} Dokumentów</Badge>
         </div>
       </div>
 
@@ -148,155 +146,171 @@ export default function InvoicesPage() {
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead onClick={() => handleSort('invoiceNumber')} className="cursor-pointer">Numer</TableHead>
-              <TableHead onClick={() => handleSort('invoiceDate')} className="cursor-pointer">Data</TableHead>
-              <TableHead onClick={() => handleSort('sellerName')} className="cursor-pointer">Sprzedawca</TableHead>
-              <TableHead>Typ</TableHead>
+              <TableHead onClick={() => handleSort('invoiceNumber')} className="cursor-pointer group">
+                Numer Faktury <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-0 group-hover:opacity-50" />
+              </TableHead>
+              <TableHead onClick={() => handleSort('invoiceDate')} className="cursor-pointer group">
+                Data <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-0 group-hover:opacity-50" />
+              </TableHead>
+              <TableHead>Sprzedawca / Nabywca</TableHead>
               <TableHead className="text-right">Kwota Brutto</TableHead>
-              <TableHead className="w-[100px] text-center">Akcje</TableHead>
+              <TableHead className="w-[120px] text-center">Akcja</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedInvoices.map((inv) => (
               <TableRow key={inv.id} className="hover:bg-slate-50 transition-colors">
-                <TableCell className="font-medium text-primary">{inv.invoiceNumber}</TableCell>
+                <TableCell className="font-semibold text-primary">{inv.invoiceNumber}</TableCell>
                 <TableCell>{inv.invoiceDate}</TableCell>
-                <TableCell className="max-w-[200px] truncate">{inv.sellerName || inv.seller?.name}</TableCell>
                 <TableCell>
-                  {inv.pdfDataUri ? (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">PDF</Badge>
-                  ) : (
-                    <Badge variant="outline" className="bg-green-50 text-green-700">XML (KSeF)</Badge>
-                  )}
+                  <div className="text-xs space-y-1">
+                    <p><span className="text-muted-foreground">S:</span> {inv.sellerName || inv.seller?.name}</p>
+                    {inv.buyerName && <p><span className="text-muted-foreground">N:</span> {inv.buyerName}</p>}
+                  </div>
                 </TableCell>
-                <TableCell className="text-right font-bold">
+                <TableCell className="text-right font-bold text-slate-900">
                   {inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency || 'PLN'}
                 </TableCell>
                 <TableCell className="text-center">
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-primary">
-                        <Eye className="h-5 w-5" />
+                      <Button size="sm" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white transition-all">
+                        <FileCode className="h-4 w-4 mr-1" />
+                        PDF
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-100">
-                      <DialogHeader className="sticky top-0 z-10 bg-white p-4 border-b flex flex-row items-center justify-between">
-                        <DialogTitle>Podgląd Faktury: {inv.invoiceNumber}</DialogTitle>
+                    <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto bg-slate-100 p-0 gap-0">
+                      <DialogHeader className="sticky top-0 z-20 bg-white p-4 border-b flex flex-row items-center justify-between shadow-sm">
+                        <DialogTitle className="text-lg">Podgląd dokumentu: {inv.invoiceNumber}</DialogTitle>
                         <div className="flex gap-2">
-                          {!inv.pdfDataUri && (
-                            <Button size="sm" onClick={() => handleDownloadPDF(inv.invoiceNumber)} disabled={isExporting}>
-                              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                              Pobierz PDF
-                            </Button>
-                          )}
-                          {inv.pdfDataUri && (
-                             <Button size="sm" asChild>
-                               <a href={inv.pdfDataUri} download={`Faktura_${inv.invoiceNumber}.pdf`}>Pobierz oryginał</a>
-                             </Button>
-                          )}
+                          <Button size="sm" onClick={() => handleDownloadPDF(inv.invoiceNumber)} disabled={isExporting}>
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                            Pobierz PDF
+                          </Button>
                         </div>
                       </DialogHeader>
                       
-                      <div className="p-4 flex justify-center">
-                        {inv.pdfDataUri ? (
-                          <iframe src={inv.pdfDataUri} className="w-full h-[700px] border rounded bg-white shadow-lg" />
-                        ) : (
-                          <div ref={invoiceRef} className="w-[210mm] min-h-[297mm] bg-white p-12 shadow-2xl rounded text-slate-800 font-sans border border-slate-200">
-                            {/* Nagłówek wizualizacji faktury z XML */}
-                            <div className="flex justify-between border-b-2 border-primary pb-8 mb-8">
-                              <div>
-                                <h1 className="text-3xl font-bold text-primary mb-2">FAKTURA VAT</h1>
-                                <p className="text-xl font-semibold">Nr: {inv.invoiceNumber}</p>
-                              </div>
-                              <div className="text-right text-sm">
-                                <p>Data wystawienia: <strong>{inv.invoiceDate}</strong></p>
-                                <p>Data sprzedaży: <strong>{inv.saleDate || inv.invoiceDate}</strong></p>
-                                <p>Waluta: <strong>{inv.currency || 'PLN'}</strong></p>
-                              </div>
+                      <div className="p-8 flex justify-center bg-slate-200/50">
+                        <div ref={invoiceRef} className="w-[210mm] min-h-[297mm] bg-white p-12 shadow-2xl rounded text-slate-800 font-sans border border-slate-300">
+                          {/* Header */}
+                          <div className="flex justify-between border-b-4 border-primary pb-8 mb-8">
+                            <div className="space-y-1">
+                              <h1 className="text-4xl font-black text-primary tracking-tighter">FAKTURA VAT</h1>
+                              <p className="text-xl font-bold text-slate-600">Numer: {inv.invoiceNumber}</p>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-12 mb-12">
-                              <div className="p-4 bg-slate-50 rounded-lg">
-                                <h2 className="text-xs font-bold uppercase text-slate-500 mb-2">Sprzedawca</h2>
-                                <p className="font-bold text-lg">{inv.sellerName}</p>
-                                <p>NIP: {inv.sellerNip}</p>
-                                <p className="text-sm mt-1">{inv.sellerAddress}</p>
-                              </div>
-                              <div className="p-4 bg-slate-50 rounded-lg border-l-4 border-primary">
-                                <h2 className="text-xs font-bold uppercase text-slate-500 mb-2">Nabywca</h2>
-                                <p className="font-bold text-lg">{inv.buyerName}</p>
-                                <p>NIP: {inv.buyerNip}</p>
-                                <p className="text-sm mt-1">{inv.buyerAddress}</p>
-                              </div>
+                            <div className="text-right space-y-1 text-sm font-medium">
+                              <p>Data wystawienia: <span className="font-bold">{inv.invoiceDate}</span></p>
+                              <p>Data sprzedaży: <span className="font-bold">{inv.saleDate || inv.invoiceDate}</span></p>
+                              <p>Miejsce wystawienia: <span className="font-bold">Grodzisk Maz.</span></p>
                             </div>
+                          </div>
 
-                            <Table>
-                              <TableHeader className="bg-slate-100">
+                          {/* Parties */}
+                          <div className="grid grid-cols-2 gap-12 mb-10">
+                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                              <h2 className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest border-b pb-1">Sprzedawca</h2>
+                              <p className="font-bold text-xl mb-1">{inv.sellerName}</p>
+                              <p className="text-sm">NIP: <span className="font-semibold">{inv.sellerNip}</span></p>
+                              <p className="text-sm text-slate-500 mt-2 leading-relaxed">{inv.sellerAddress}</p>
+                            </div>
+                            <div className="bg-primary/5 p-6 rounded-xl border border-primary/10">
+                              <h2 className="text-[10px] font-black uppercase text-primary/40 mb-3 tracking-widest border-b border-primary/10 pb-1">Nabywca</h2>
+                              <p className="font-bold text-xl mb-1">{inv.buyerName}</p>
+                              <p className="text-sm">NIP: <span className="font-semibold">{inv.buyerNip}</span></p>
+                              <p className="text-sm text-slate-500 mt-2 leading-relaxed">{inv.buyerAddress}</p>
+                            </div>
+                          </div>
+
+                          {/* Items Table */}
+                          <div className="mb-10">
+                            <Table className="border rounded-lg overflow-hidden">
+                              <TableHeader className="bg-slate-100 border-b-2">
                                 <TableRow>
-                                  <TableHead className="text-slate-700">Lp.</TableHead>
-                                  <TableHead className="text-slate-700">Nazwa towaru / usługi</TableHead>
-                                  <TableHead className="text-right text-slate-700">Ilość</TableHead>
-                                  <TableHead className="text-right text-slate-700">Cena netto</TableHead>
-                                  <TableHead className="text-right text-slate-700">VAT</TableHead>
-                                  <TableHead className="text-right text-slate-700">Wartość netto</TableHead>
+                                  <TableHead className="w-10 text-center font-bold">Lp.</TableHead>
+                                  <TableHead className="font-bold">Nazwa towaru lub usługi</TableHead>
+                                  <TableHead className="text-center font-bold">Ilość</TableHead>
+                                  <TableHead className="text-right font-bold">Cena netto</TableHead>
+                                  <TableHead className="text-center font-bold">VAT</TableHead>
+                                  <TableHead className="text-right font-bold">Wartość netto</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {inv.items && inv.items.map((item: any, idx: number) => (
-                                  <TableRow key={idx}>
-                                    <TableCell>{idx + 1}</TableCell>
-                                    <TableCell className="font-medium">{item.description}</TableCell>
-                                    <TableCell className="text-right">{item.quantity}</TableCell>
-                                    <TableCell className="text-right">{item.unitPrice?.toLocaleString('pl-PL')} {inv.currency}</TableCell>
-                                    <TableCell className="text-right">{item.vatRate}</TableCell>
-                                    <TableCell className="text-right font-semibold">{item.netValue?.toLocaleString('pl-PL')} {inv.currency}</TableCell>
-                                  </TableRow>
-                                ))}
-                                {!inv.items && (
+                                {inv.items && inv.items.length > 0 ? (
+                                  inv.items.map((item: any, idx: number) => (
+                                    <TableRow key={idx} className="border-b">
+                                      <TableCell className="text-center text-slate-500">{idx + 1}</TableCell>
+                                      <TableCell className="font-semibold text-slate-700">{item.description}</TableCell>
+                                      <TableCell className="text-center">{item.quantity}</TableCell>
+                                      <TableCell className="text-right">{item.unitPrice?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</TableCell>
+                                      <TableCell className="text-center">{item.vatRate}</TableCell>
+                                      <TableCell className="text-right font-bold">{item.netValue?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</TableCell>
+                                    </TableRow>
+                                  ))
+                                ) : (
                                   <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-slate-400">Pozycje faktury zostaną wygenerowane przy eksporcie.</TableCell>
+                                    <TableCell colSpan={6} className="text-center py-12 text-slate-400 italic">
+                                      Brak szczegółowych pozycji w pliku źródłowym.
+                                    </TableCell>
                                   </TableRow>
                                 )}
                               </TableBody>
                             </Table>
+                          </div>
 
-                            <div className="mt-12 flex justify-end">
-                              <div className="w-80 space-y-3 bg-slate-50 p-6 rounded-xl border border-slate-200">
-                                <div className="flex justify-between text-sm">
-                                  <span>Suma netto:</span>
-                                  <span>{inv.totalNet?.toLocaleString('pl-PL')} {inv.currency}</span>
+                          {/* Totals */}
+                          <div className="flex justify-end pt-6">
+                            <div className="w-80 space-y-4 bg-slate-900 text-white p-8 rounded-2xl shadow-xl">
+                              <div className="flex justify-between items-center text-slate-400 text-sm">
+                                <span>Wartość Netto</span>
+                                <span className="font-mono">{inv.totalNet?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-slate-400 text-sm">
+                                <span>Kwota VAT</span>
+                                <span className="font-mono">{inv.totalVat?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency}</span>
+                              </div>
+                              <div className="border-t border-slate-700 pt-4 flex justify-between items-end">
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-bold text-primary uppercase">Razem do zapłaty</p>
+                                  <p className="text-3xl font-black">{inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</p>
                                 </div>
-                                <div className="flex justify-between text-sm">
-                                  <span>Kwota VAT:</span>
-                                  <span>{inv.totalVat?.toLocaleString('pl-PL')} {inv.currency}</span>
-                                </div>
-                                <div className="flex justify-between text-xl font-bold text-primary pt-3 border-t">
-                                  <span>DO ZAPŁATY:</span>
-                                  <span>{inv.totalGross?.toLocaleString('pl-PL')} {inv.currency}</span>
-                                </div>
+                                <span className="text-lg font-bold text-slate-500 pb-1">{inv.currency}</span>
                               </div>
                             </div>
-
-                            <div className="mt-20 pt-8 border-t text-[10px] text-slate-400 text-center">
-                              Dokument wygenerowany systemowo z danych KSeF XML. Nie wymaga podpisu.
-                            </div>
                           </div>
-                        )}
+
+                          {/* Footer Info */}
+                          <div className="mt-24 pt-8 border-t border-slate-100 grid grid-cols-2 gap-10">
+                             <div className="text-[10px] text-slate-400 leading-relaxed uppercase tracking-wider">
+                                Faktura została wygenerowana automatycznie na podstawie danych przesłanych do Krajowego Systemu e-Faktur (KSeF). Dokument nie wymaga podpisu ani pieczęci.
+                             </div>
+                             <div className="text-right text-[10px] text-slate-400 space-y-1">
+                                <p>System: KSeF Faktury Cloud v2.0</p>
+                                <p>Identyfikator KSeF: {inv.id || 'GENERATED-LOCAL'}</p>
+                             </div>
+                          </div>
+                        </div>
                       </div>
                     </DialogContent>
                   </Dialog>
                 </TableCell>
               </TableRow>
             ))}
+            {paginatedInvoices.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-20 text-muted-foreground">
+                  Nie znaleziono faktur spełniających kryteria.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 py-4">
-          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Poprzednia</Button>
-          <span className="text-sm font-medium">Strona {currentPage} z {totalPages}</span>
-          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Następna</Button>
+        <div className="flex items-center justify-center gap-4 py-6">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Wstecz</Button>
+          <span className="text-sm font-semibold bg-white px-4 py-1 rounded-full shadow-sm border">Strona {currentPage} z {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Dalej</Button>
         </div>
       )}
     </div>

@@ -1,7 +1,6 @@
-
 /**
  * @fileOverview Zaawansowany, kliencki parser XML dla KSeF FA(3).
- * Wyciąga pełne dane faktury, w tym pozycje i dane adresowe.
+ * Wyciąga pełne dane faktury, w tym wszystkie pozycje towarowe i dane adresowe.
  */
 
 export interface InvoiceItem {
@@ -36,6 +35,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
+      // Szukamy tagu bez względu na przestrzeń nazw (prefix:)
       const el = parent.getElementsByTagNameNS("*", tagName)[0] || parent.getElementsByTagName(tagName)[0];
       return el ? el.textContent?.trim() || "" : "";
     };
@@ -49,6 +49,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       return `${l1}, ${l2}`;
     };
 
+    // Podmioty
     const podmiot1 = xmlDoc.getElementsByTagNameNS("*", "Podmiot1")[0] || xmlDoc.getElementsByTagName("Podmiot1")[0];
     const podmiot2 = xmlDoc.getElementsByTagNameNS("*", "Podmiot2")[0] || xmlDoc.getElementsByTagName("Podmiot2")[0];
 
@@ -56,25 +57,34 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const wierszeEls = Array.from(xmlDoc.getElementsByTagNameNS("*", "FaWiersz") || xmlDoc.getElementsByTagName("FaWiersz"));
     const items: InvoiceItem[] = wierszeEls.map(w => ({
       description: getVal("P_7", w),
-      quantity: parseFloat(getVal("P_8B", w)) || 0,
-      unitPrice: parseFloat(getVal("P_9A", w)) || 0,
-      netValue: parseFloat(getVal("P_11", w)) || 0,
-      vatValue: parseFloat(getVal("P_11Vat", w)) || 0,
+      quantity: parseFloat(getVal("P_8B", w).replace(",", ".")) || 0,
+      unitPrice: parseFloat(getVal("P_9A", w).replace(",", ".")) || 0,
+      netValue: parseFloat(getVal("P_11", w).replace(",", ".")) || 0,
+      vatValue: parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0,
       vatRate: getVal("P_12", w) + "%"
     }));
+
+    // Sumowanie kwot (obsługa wielu stawek VAT)
+    const sumNet = parseFloat(getVal("P_13_1").replace(",", ".")) || 0 + 
+                   parseFloat(getVal("P_13_2").replace(",", ".")) || 0 + 
+                   parseFloat(getVal("P_13_3").replace(",", ".")) || 0;
+                   
+    const sumVat = parseFloat(getVal("P_14_1").replace(",", ".")) || 0 + 
+                   parseFloat(getVal("P_14_2").replace(",", ".")) || 0 + 
+                   parseFloat(getVal("P_14_3").replace(",", ".")) || 0;
 
     const data: ParsedKSeF = {
       invoiceNumber: getVal("P_2"),
       invoiceDate: getVal("P_1"),
-      saleDate: getVal("P_6"),
+      saleDate: getVal("P_6") || getVal("P_1"),
       sellerName: podmiot1 ? getVal("Nazwa", podmiot1) : "",
       sellerNip: podmiot1 ? getVal("NIP", podmiot1) : "",
       sellerAddress: getAddress(podmiot1 as Element),
       buyerName: podmiot2 ? getVal("Nazwa", podmiot2) : "",
       buyerNip: podmiot2 ? getVal("NIP", podmiot2) : "",
       buyerAddress: getAddress(podmiot2 as Element),
-      totalNet: parseFloat(getVal("P_13_1").replace(",", ".")) || 0,
-      totalVat: parseFloat(getVal("P_14_1").replace(",", ".")) || 0,
+      totalNet: sumNet || (parseFloat(getVal("P_15").replace(",", ".")) - sumVat),
+      totalVat: sumVat,
       totalGross: parseFloat(getVal("P_15").replace(",", ".")) || 0,
       currency: getVal("KodWaluty") || "PLN",
       items
