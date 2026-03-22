@@ -142,6 +142,15 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const typeCode = getVal("RodzajFaktury") || "VAT";
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
     const amountToPay = parseFloat(getVal("DoZaplaty").replace(",", ".")) || gross;
+    
+    // Obliczanie całkowitej kwoty netto (z zestawienia VAT lub sumy pozycji)
+    let totalNet = vats.reduce((s, v) => s + v.net, 0);
+    if (totalNet === 0) {
+      totalNet = items.reduce((s, i) => s + i.netValue, 0);
+    }
+    if (totalNet === 0 && gross !== 0) {
+      totalNet = gross / 1.23; // Bardzo zgrubne przybliżenie jeśli brak danych
+    }
 
     return {
       id: 'ksef-' + Date.now() + Math.random().toString(36).substr(2, 5),
@@ -157,8 +166,8 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       recipient,
       bankAccount: getVal("NrRB"),
       bankName: getVal("NazwaBanku"),
-      totalNet: vats.reduce((s, v) => s + v.net, 0) || (gross / 1.23),
-      totalVat: vats.reduce((s, v) => s + v.vat, 0) || (gross - (gross / 1.23)),
+      totalNet: totalNet,
+      totalVat: vats.reduce((s, v) => s + v.vat, 0) || (gross - totalNet),
       totalGross: gross,
       amountToPay: amountToPay,
       items,

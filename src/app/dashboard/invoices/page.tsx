@@ -47,7 +47,8 @@ export default function InvoicesPage() {
   const [endDate, setEndDate] = useState("")
   const [sellerFilter, setSellerFilter] = useState("")
   const [buyerFilter, setBuyerFilter] = useState("")
-  const [typeFilter, setTypeFilter] = useState("ALL")
+  const [minNet, setMinNet] = useState("")
+  const [maxNet, setMaxNet] = useState("")
   
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc' | null}>({ 
     key: 'invoiceDate', 
@@ -106,24 +107,33 @@ export default function InvoicesPage() {
         (inv.buyerName || "").toLowerCase().includes(buyerFilter.toLowerCase()) ||
         (inv.buyerNip || "").includes(buyerFilter)
 
-      const matchesType = typeFilter === "ALL" || inv.documentTypeCode === typeFilter;
-
       const invDate = inv.invoiceDate || "";
       const matchesStartDate = startDate === "" || invDate >= startDate;
       const matchesEndDate = endDate === "" || invDate <= endDate;
 
-      return matchesSearch && matchesSeller && matchesBuyer && matchesStartDate && matchesEndDate && matchesType;
+      const invNet = inv.totalNet || 0;
+      const matchesMinNet = minNet === "" || invNet >= parseFloat(minNet);
+      const matchesMaxNet = maxNet === "" || invNet <= parseFloat(maxNet);
+
+      return matchesSearch && matchesSeller && matchesBuyer && matchesStartDate && matchesEndDate && matchesMinNet && matchesMaxNet;
     })
-  }, [searchQuery, sellerFilter, buyerFilter, startDate, endDate, typeFilter, invoices])
+  }, [searchQuery, sellerFilter, buyerFilter, startDate, endDate, minNet, maxNet, invoices])
 
   const sortedInvoices = useMemo(() => {
     const items = [...filteredInvoices]
     if (sortConfig.direction !== null) {
       items.sort((a, b) => {
-        const valA = a[sortConfig.key] || "";
-        const valB = b[sortConfig.key] || "";
-        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        const valA = a[sortConfig.key];
+        const valB = b[sortConfig.key];
+        
+        if (typeof valA === 'number' && typeof valB === 'number') {
+           return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        }
+
+        const strA = (valA || "").toString().toLowerCase();
+        const strB = (valB || "").toString().toLowerCase();
+        if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
       })
     }
@@ -149,7 +159,8 @@ export default function InvoicesPage() {
     setEndDate("")
     setSellerFilter("")
     setBuyerFilter("")
-    setTypeFilter("ALL")
+    setMinNet("")
+    setMaxNet("")
     setCurrentPage(1)
   }
 
@@ -170,7 +181,7 @@ export default function InvoicesPage() {
             <Filter className="h-4 w-4" />
             Filtrowanie zaawansowane
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Numer Faktury</label>
               <Input 
@@ -190,20 +201,6 @@ export default function InvoicesPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">Typ Dokumentu</label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Wszystkie" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Wszystkie</SelectItem>
-                  <SelectItem value="VAT">Faktura VAT</SelectItem>
-                  <SelectItem value="KOR">Korekta</SelectItem>
-                  <SelectItem value="ZAL">Zaliczkowa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Nabywca / NIP</label>
               <Input 
                 placeholder="NIP lub nazwa..." 
@@ -219,6 +216,14 @@ export default function InvoicesPage() {
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Data Do</label>
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Kwota Netto Od</label>
+              <Input type="number" placeholder="Min PLN" value={minNet} onChange={(e) => setMinNet(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Kwota Netto Do</label>
+              <Input type="number" placeholder="Max PLN" value={maxNet} onChange={(e) => setMaxNet(e.target.value)} className="h-9" />
             </div>
           </div>
           <div className="mt-4 flex justify-between items-center">
@@ -237,14 +242,14 @@ export default function InvoicesPage() {
               <TableHead onClick={() => handleSort('invoiceNumber')} className="cursor-pointer group whitespace-nowrap">
                 Numer Faktury <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
               </TableHead>
-              <TableHead onClick={() => handleSort('documentType')} className="cursor-pointer group">
-                Typ <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
-              </TableHead>
               <TableHead onClick={() => handleSort('invoiceDate')} className="cursor-pointer group">
                 Data Wyst. <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
               </TableHead>
               <TableHead>Sprzedawca / NIP</TableHead>
               <TableHead>Nabywca / NIP</TableHead>
+              <TableHead onClick={() => handleSort('totalNet')} className="text-right cursor-pointer group">
+                Wartość Netto <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
+              </TableHead>
               <TableHead onClick={() => handleSort('totalGross')} className="text-right cursor-pointer group">
                 Wartość Brutto <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
               </TableHead>
@@ -259,11 +264,6 @@ export default function InvoicesPage() {
             ) : paginatedInvoices.map((inv) => (
               <TableRow key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <TableCell className="font-bold text-primary">{inv.invoiceNumber}</TableCell>
-                <TableCell>
-                  <Badge variant={inv.documentTypeCode === 'KOR' ? 'destructive' : 'outline'} className="text-[9px] px-1.5 py-0">
-                    {inv.documentType || 'Faktura VAT'}
-                  </Badge>
-                </TableCell>
                 <TableCell className="text-xs">{inv.invoiceDate}</TableCell>
                 <TableCell>
                   <div className="text-[10px] leading-tight">
@@ -276,6 +276,9 @@ export default function InvoicesPage() {
                     <p className="font-bold text-slate-700 truncate max-w-[180px]">{inv.buyerName}</p>
                     <p className="text-muted-foreground font-mono">{inv.buyerNip}</p>
                   </div>
+                </TableCell>
+                <TableCell className="text-right font-bold text-slate-700">
+                  {inv.totalNet?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} <span className="text-[9px] font-normal text-muted-foreground ml-1">{inv.currency}</span>
                 </TableCell>
                 <TableCell className="text-right font-black text-slate-900">
                   {inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} <span className="text-[10px] font-normal text-muted-foreground ml-1">{inv.currency}</span>
