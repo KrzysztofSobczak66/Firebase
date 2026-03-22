@@ -21,15 +21,18 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Sprawdź czy konfiguracja jest poprawna
+export const isFirebaseConfigured = !!firebaseConfig.apiKey && 
+                                   !firebaseConfig.apiKey.includes('TWÓJ') && 
+                                   firebaseConfig.apiKey !== 'dummy-key' &&
+                                   firebaseConfig.apiKey.length > 10;
+
 function getFirebaseApp() {
   if (getApps().length > 0) return getApp();
   
-  const apiKey = firebaseConfig.apiKey;
-  const isConfigured = !!apiKey && !apiKey.includes('TWÓJ') && apiKey !== 'dummy-key';
-  
-  if (!isConfigured) {
-    console.warn("Baza danych nie jest skonfigurowana. Dane nie zostaną zapisane w chmurze.");
-    return initializeApp({ ...firebaseConfig, apiKey: 'dummy-key' });
+  if (!isFirebaseConfigured) {
+    // Inicjalizacja atrapy dla trybu bez chmury
+    return initializeApp({ ...firebaseConfig, apiKey: 'dummy-key', projectId: 'demo-project' });
   }
   
   return initializeApp(firebaseConfig);
@@ -39,9 +42,7 @@ const app = getFirebaseApp();
 export const db = getFirestore(app);
 
 export async function findInvoiceByDetails(invoiceNumber: string) {
-  if (!invoiceNumber) return null;
-  const apiKey = firebaseConfig.apiKey;
-  if (!apiKey || apiKey.includes('TWÓJ') || apiKey === 'dummy-key') return null;
+  if (!invoiceNumber || !isFirebaseConfigured) return null;
   
   try {
     const q = query(
@@ -59,9 +60,9 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
 }
 
 export async function saveInvoice(invoiceData: any) {
-  const apiKey = firebaseConfig.apiKey;
-  if (!apiKey || apiKey.includes('TWÓJ') || apiKey === 'dummy-key') {
-    throw new Error("Brak konfiguracji Firebase w pliku .env");
+  if (!isFirebaseConfigured) {
+    console.log("Symulacja zapisu (brak kluczy API):", invoiceData.invoiceNumber);
+    return { status: 'added', id: 'mock-id-' + Math.random() };
   }
 
   try {
@@ -90,8 +91,7 @@ export async function saveInvoice(invoiceData: any) {
 }
 
 export async function getAllInvoices() {
-  const apiKey = firebaseConfig.apiKey;
-  if (!apiKey || apiKey.includes('TWÓJ') || apiKey === 'dummy-key') return [];
+  if (!isFirebaseConfigured) return [];
   try {
     const querySnapshot = await getDocs(collection(db, "invoices"));
     return querySnapshot.docs.map(doc => ({
@@ -105,10 +105,12 @@ export async function getAllInvoices() {
 }
 
 export async function deleteInvoice(id: string) {
+  if (!isFirebaseConfigured) return;
   await deleteDoc(doc(db, "invoices", id));
 }
 
 export async function updateInvoice(id: string, data: any) {
+  if (!isFirebaseConfigured) return;
   const docRef = doc(db, "invoices", id);
   await updateDoc(docRef, {
     ...data,
