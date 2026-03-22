@@ -35,9 +35,6 @@ const ksefParsePrompt = ai.definePrompt({
   name: 'ksefParsePrompt',
   input: { schema: KSeFParseInputSchema },
   output: { schema: KSeFParseOutputSchema },
-  config: {
-    model: 'googleai/gemini-1.5-flash',
-  },
   prompt: `You are a specialist in Polish KSeF XML (FA(3) schema). 
   Parse the following XML content and extract all required fields. 
   Pay close attention to namespaces (e.g., ns0:).

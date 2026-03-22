@@ -39,9 +39,6 @@ const pdfPrompt = ai.definePrompt({
   name: 'pdfInvoiceDataExtractionPrompt',
   input: { schema: PdfInvoiceDataExtractionInputSchema },
   output: { schema: PdfInvoiceDataExtractionOutputSchema },
-  config: {
-    model: 'googleai/gemini-1.5-flash',
-  },
   prompt: `Extract structured data from this PDF invoice: {{media url=pdfDataUri}}`,
 });
 
