@@ -10,7 +10,7 @@ import {
   getFirestore,
   limit
 } from "firebase/firestore";
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -21,14 +21,25 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Inicjalizacja Firebase z obsługą braku konfiguracji
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Inicjalizacja Firebase z obsługą błędów konfiguracji
+function getFirebaseApp() {
+  if (getApps().length > 0) return getApp();
+  
+  // Jeśli brakuje klucza, nie wywalaj aplikacji, ale zaloguj błąd
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('TWÓJ')) {
+    console.warn("Baza danych nie jest skonfigurowana. Dane nie zostaną zapisane.");
+    return initializeApp({ ...firebaseConfig, apiKey: 'dummy' });
+  }
+  
+  return initializeApp(firebaseConfig);
+}
+
+const app = getFirebaseApp();
 export const db = getFirestore(app);
 
 export async function findInvoiceByDetails(invoiceNumber: string) {
-  if (!invoiceNumber) return null;
+  if (!invoiceNumber || !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) return null;
   
-  // Uproszczone zapytanie tylko po numerze faktury, aby uniknąć problemów z indeksami
   const q = query(
     collection(db, "invoices"), 
     where("invoiceNumber", "==", invoiceNumber),
@@ -40,35 +51,27 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
     if (querySnapshot.empty) return null;
     return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
   } catch (error) {
-    console.error("Błąd podczas wyszukiwania faktury:", error);
+    console.error("Błąd wyszukiwania faktury:", error);
     return null;
   }
 }
 
 export async function saveInvoice(invoiceData: any) {
+  if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY.includes('TWÓJ')) {
+    console.error("Nie można zapisać: Brak klucza API Firebase.");
+    throw new Error("Brak konfiguracji bazy danych");
+  }
+
   try {
     const invoiceNumber = invoiceData.invoiceNumber;
-    if (!invoiceNumber) {
-      throw new Error("Brak numeru faktury w danych wejściowych.");
-    }
-
     const existing = await findInvoiceByDetails(invoiceNumber);
     
     if (existing) {
       const docRef = doc(db, "invoices", existing.id);
-      const updateData: any = {
+      await updateDoc(docRef, {
+        ...invoiceData,
         updatedAt: new Date().toISOString()
-      };
-
-      if (invoiceData.pdfDataUri && !(existing as any).pdfDataUri) {
-        updateData.pdfDataUri = invoiceData.pdfDataUri;
-      }
-      
-      if (invoiceData.items && !(existing as any).items) {
-        Object.assign(updateData, invoiceData);
-      }
-
-      await updateDoc(docRef, updateData);
+      });
       return { status: 'updated', id: existing.id };
     }
 
@@ -80,12 +83,13 @@ export async function saveInvoice(invoiceData: any) {
     });
     return { status: 'added', id: docRef.id };
   } catch (error) {
-    console.error("Szczegółowy błąd zapisu faktury:", error);
+    console.error("Błąd zapisu faktury:", error);
     throw error;
   }
 }
 
 export async function getAllInvoices() {
+  if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) return [];
   try {
     const querySnapshot = await getDocs(collection(db, "invoices"));
     return querySnapshot.docs.map(doc => ({
@@ -93,7 +97,7 @@ export async function getAllInvoices() {
       ...doc.data()
     }));
   } catch (error) {
-    console.error("Błąd pobierania wszystkich faktur:", error);
+    console.error("Błąd pobierania:", error);
     return [];
   }
 }
