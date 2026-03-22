@@ -20,7 +20,8 @@ import {
   RefreshCw, 
   Globe,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  LayoutDashboard
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
@@ -161,38 +162,41 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-4">
               <div className="space-y-2">
-                <p className="font-bold text-slate-900">Jak udostępnić link?</p>
+                <p className="font-bold text-slate-900">Kroki do publikacji:</p>
                 <ol className="list-decimal list-inside space-y-2">
-                  <li>Przejdź do konsoli <b>Firebase Console</b>.</li>
-                  <li>Wybierz swój projekt i sekcję <b>App Hosting</b>.</li>
-                  <li>Połącz repozytorium i uruchom wdrożenie.</li>
-                  <li>Otrzymasz publiczny link (np. <i>nazwa.web.app</i>).</li>
+                  <li>Otwórz <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">Konsolę Firebase <ExternalLink className="h-3 w-3" /></a>.</li>
+                  <li>Wybierz swój projekt i sekcję <b>Build > App Hosting</b>.</li>
+                  <li>Kliknij "Get started" i połącz swoje repozytorium GitHub.</li>
+                  <li>Postępuj zgodnie z instrukcjami, aby utworzyć Backend.</li>
+                  <li>Po wdrożeniu otrzymasz publiczny adres URL (np. <i>nazwa.web.app</i>).</li>
                 </ol>
               </div>
-              <p className="text-xs italic bg-white p-3 rounded border">
-                Każdy użytkownik, który zarejestruje się pod publicznym linkiem, będzie widział wspólną listę faktur, ale tylko Ty będziesz miał dostęp do tego panelu.
-              </p>
-              <Button variant="outline" className="w-full" asChild>
-                <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer">
-                  Otwórz Firebase Console <ExternalLink className="h-3 w-3 ml-2" />
-                </a>
-              </Button>
+              <div className="p-4 bg-white rounded-lg border border-primary/20">
+                <p className="text-xs font-bold text-primary mb-2 flex items-center gap-2">
+                  <LayoutDashboard className="h-3 w-3" /> Konsola Firebase
+                </p>
+                <p className="text-xs mb-3 text-slate-500">Zarządzaj bazą danych, użytkownikami i monitoringiem bezpośrednio w chmurze Google.</p>
+                <Button variant="default" className="w-full bg-primary" asChild>
+                  <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">
+                    Otwórz Konsolę Teraz <ExternalLink className="h-3 w-3 ml-2" />
+                  </a>
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-green-600" /> Bezpieczeństwo
+                <ShieldCheck className="h-5 w-5 text-green-600" /> Twoja Rola
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-2">
-              <p>Aktualnie zalogowany jako: <b>{user?.email}</b></p>
-              <p>Rola: <span className="text-green-600 font-bold">SUPER ADMINISTRATOR</span></p>
+              <p>Zalogowany jako: <b>{user?.email}</b></p>
+              <p>Uprawnienia: <span className="text-green-600 font-bold">SUPER ADMINISTRATOR</span></p>
               <hr className="my-3" />
-              <p className="text-xs">
-                Współpracownicy po rejestracji otrzymują uprawnienia <b>Tylko do odczytu</b>. 
-                Nie mogą usuwać dokumentów ani importować nowych danych.
+              <p className="text-xs italic">
+                Każdy nowy użytkownik, który zarejestruje się pod Twoim linkiem, otrzyma automatycznie uprawnienia <b>Tylko do odczytu</b>.
               </p>
             </CardContent>
           </Card>

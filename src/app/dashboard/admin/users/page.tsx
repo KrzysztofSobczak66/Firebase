@@ -21,7 +21,9 @@ import {
   ShieldCheck,
   Search,
   Trash2,
-  Users
+  Users,
+  Copy,
+  Check
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase"
@@ -38,6 +40,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [copied, setCopied] = useState(false)
   const { toast } = useToast()
 
   const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu']
@@ -78,6 +81,14 @@ export default function AdminUsersPage() {
     }
   }
 
+  const handleCopyLink = () => {
+    const url = window.location.origin + "/login"
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    toast({ title: "Skopiowano", description: "Link do rejestracji jest w schowku." })
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const filteredUsers = users.filter(u => 
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -94,8 +105,12 @@ export default function AdminUsersPage() {
           <p className="text-slate-500">Przeglądaj i zarządzaj dostępem do systemu.</p>
         </div>
         <div className="flex gap-2">
+           <Button onClick={handleCopyLink} variant="default" className="bg-primary">
+             {copied ? <Check className="h-4 w-4 mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />} 
+             Zaproś Użytkownika
+           </Button>
            <Button onClick={() => fetchUsers()} variant="outline" disabled={loading}>
-             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Odśwież listę"}
+             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Odśwież"}
            </Button>
         </div>
       </div>
@@ -187,11 +202,15 @@ export default function AdminUsersPage() {
               <Mail className="h-5 w-5 text-primary" /> Jak dodać użytkownika?
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-slate-600 space-y-2">
-            <p>1. Udostępnij link do aplikacji swojemu współpracownikowi.</p>
-            <p>2. Poproś go o samodzielną rejestrację przez stronę główną.</p>
-            <p>3. Po pierwszym zalogowaniu użytkownik pojawi się na powyższej liście.</p>
-            <p>4. Każdy zarejestrowany użytkownik ma dostęp do wspólnej bazy faktur w trybie "tylko do odczytu".</p>
+          <CardContent className="text-sm text-slate-600 space-y-4">
+            <p>1. Kliknij przycisk <b>"Zaproś Użytkownika"</b> u góry ekranu, aby skopiować link do rejestracji.</p>
+            <p>2. Wyślij ten link do swojego współpracownika.</p>
+            <p>3. Poproś go o samodzielną rejestrację konta.</p>
+            <p>4. Po pierwszym zalogowaniu użytkownik pojawi się automatycznie na tej liście z uprawnieniami <b>Tylko do odczytu</b>.</p>
+            <div className="p-3 bg-slate-50 rounded border border-dashed border-slate-200">
+               <p className="text-xs font-bold text-slate-500 mb-1">Twój link do zaproszeń:</p>
+               <code className="text-[10px] break-all text-primary">{typeof window !== 'undefined' ? window.location.origin + "/login" : ""}</code>
+            </div>
           </CardContent>
         </Card>
       </div>
