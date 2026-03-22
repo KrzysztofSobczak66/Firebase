@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2, Key, Info } from "lucide-react"
+import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2, Info } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { parseKSeFXML } from "@/ai/flows/parse-ksef-xml-flow"
@@ -32,37 +32,37 @@ export default function AdminImportPage() {
     try {
       if (file.name.toLowerCase().endsWith('.xml')) {
         const content = await file.text()
-        // Nowy parser manualny jest błyskawiczny
+        // Parser lokalny jest błyskawiczny i nie wymaga AI
         const parsedData = await parseKSeFXML(content)
         
-        await saveInvoice({
+        const res = await saveInvoice({
           ...parsedData,
           sourceFile: file.name
-        }).then(res => {
-          if (res.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
-          else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
         })
+
+        if (res.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
+        else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
       } 
       else if (file.name.toLowerCase().endsWith('.pdf')) {
         const dataUri = await fileToBase64(file)
+        // PDF nadal wymaga AI, ale z lepszą obsługą błędów
         const extractedData = await extractPdfInvoiceData({ pdfDataUri: dataUri })
         
-        await saveInvoice({
+        const res = await saveInvoice({
           ...extractedData,
           sellerName: extractedData.seller?.name,
           sellerNip: extractedData.seller?.nip,
           pdfDataUri: dataUri,
           sourceFile: file.name
-        }).then(res => {
-          if (res.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
-          else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
         })
-        // PDF potrzebuje AI, więc dajemy mu chwilę oddechu
-        await new Promise(r => setTimeout(r, 1000))
+
+        if (res.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
+        else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
       }
     } catch (error: any) {
       console.error(`Błąd pliku ${file.name}:`, error)
       setStats(prev => ({ ...prev, errors: prev.errors + 1 }))
+      // Nie rzucamy błędu dalej, żeby pętla mogła kontynuować import kolejnych plików
     }
   }
 
@@ -75,20 +75,30 @@ export default function AdminImportPage() {
     setStats({ added: 0, updated: 0, total: files.length, errors: 0 })
 
     const fileList = Array.from(files)
-    // Szybka kolejka XML, potem PDF
+    // Kolejkujemy XML najpierw (szybkie), potem PDF (wolne)
     const sortedFiles = fileList.sort((a, b) => {
       if (a.name.endsWith('.xml') && !b.name.endsWith('.xml')) return -1
+      if (!a.name.endsWith('.xml') && b.name.endsWith('.xml')) return 1
       return 0
     })
 
+    // Przetwarzamy pliki jeden po drugim z małymi przerwami dla stabilności
     for (let i = 0; i < sortedFiles.length; i++) {
       await processFile(sortedFiles[i])
       setProgress(Math.round(((i + 1) / sortedFiles.length) * 100))
+      
+      // Krótka przerwa co 10 plików, żeby nie blokować wątku UI
+      if (i % 10 === 0) {
+        await new Promise(r => setTimeout(r, 50))
+      }
     }
 
     setIsUploading(false)
     setCurrentFile("")
-    toast({ title: "Synchronizacja zakończona", description: `Przetworzono ${files.length} plików.` })
+    toast({ 
+      title: "Synchronizacja zakończona", 
+      description: `Przetworzono ${files.length} plików. Sukces: ${stats.added + stats.updated}, Błędy: ${stats.errors + (stats.total - (stats.added + stats.updated + stats.errors))}` 
+    })
     event.target.value = ''
   }
 
@@ -96,9 +106,10 @@ export default function AdminImportPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <Alert className="bg-blue-50 border-blue-200">
         <Info className="h-4 w-4 text-blue-600" />
-        <AlertTitle>Ulepszony Import</AlertTitle>
+        <AlertTitle>Zoptymalizowany Silnik Importu</AlertTitle>
         <AlertDescription>
-          Pliki XML są teraz przetwarzane błyskawicznie bez użycia AI. Tylko pliki PDF wymagają połączenia z modelem Gemini.
+          Pliki XML są teraz parsowane lokalnie (błyskawicznie). Tylko analiza dokumentów PDF wymaga połączenia z AI. 
+          Błędy pojedynczych plików nie zatrzymują już całego procesu.
         </AlertDescription>
       </Alert>
 
@@ -121,8 +132,8 @@ export default function AdminImportPage() {
               {isUploading ? <Loader2 className="h-8 w-8 text-primary animate-spin" /> : <RefreshCw className="h-8 w-8 text-primary" />}
             </div>
             <div className="text-center">
-              <p className="font-semibold text-lg">Wybierz pliki do importu</p>
-              <p className="text-sm text-muted-foreground">Możesz wrzucić nawet 1000+ plików naraz.</p>
+              <p className="font-semibold text-lg">Kliknij, aby wybrać pliki</p>
+              <p className="text-sm text-muted-foreground">Obsługa do 2000 plików jednocześnie.</p>
             </div>
           </div>
 
@@ -132,7 +143,7 @@ export default function AdminImportPage() {
                 <div className="flex justify-between text-sm font-medium">
                   <span className="flex items-center gap-2">
                     {isUploading ? (
-                      <>Przetwarzanie: <span className="text-primary truncate max-w-[200px]">{currentFile}</span></>
+                      <>Przetwarzanie: <span className="text-primary truncate max-w-[250px]">{currentFile}</span></>
                     ) : 'Wynik importu'}
                   </span>
                   <span>{stats.added + stats.updated + stats.errors} / {stats.total}</span>

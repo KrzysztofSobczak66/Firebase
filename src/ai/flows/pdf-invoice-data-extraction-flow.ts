@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Ekstrakcja danych z PDF przy użyciu poprawnej konfiguracji modelu.
+ * @fileOverview Ekstrakcja danych z PDF przy użyciu Gemini 1.5 Flash.
  */
 
 import {ai} from '@/ai/genkit';
@@ -21,18 +21,24 @@ export type PdfInvoiceDataExtractionOutput = z.infer<typeof PdfInvoiceDataExtrac
 export async function extractPdfInvoiceData(input: { pdfDataUri: string }): Promise<PdfInvoiceDataExtractionOutput> {
   try {
     const response = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
+      model: 'googleai/gemini-1.5-flash-latest',
       prompt: [
-        { text: 'Extract invoice data: number, date (YYYY-MM-DD), seller name, seller NIP, and total gross amount.' },
+        { text: 'Jesteś ekspertem od faktur. Wyciągnij z tego pliku PDF następujące dane: numer faktury, datę wystawienia (YYYY-MM-DD), nazwę sprzedawcy, NIP sprzedawcy oraz kwotę brutto.' },
         { media: { url: input.pdfDataUri } }
       ],
       output: { schema: PdfInvoiceDataExtractionOutputSchema }
     });
     
-    if (!response.output) throw new Error('AI returned empty output.');
+    if (!response.output) {
+      throw new Error('Model AI nie zwrócił danych.');
+    }
+    
     return response.output;
   } catch (error: any) {
     console.error("AI PDF Extraction Error:", error);
-    throw error;
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      throw new Error("Model AI nie został odnaleziony. Sprawdź konfigurację klucza API i regionu.");
+    }
+    throw new Error(`Błąd AI: ${error.message || 'Nieznany błąd podczas analizy PDF'}`);
   }
 }
