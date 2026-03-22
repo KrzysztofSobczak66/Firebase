@@ -3,18 +3,20 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
+import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2, Key } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { parseKSeFXML } from "@/ai/flows/parse-ksef-xml-flow"
 import { extractPdfInvoiceData } from "@/ai/flows/pdf-invoice-data-extraction-flow"
 import { saveInvoice } from "@/lib/firestore"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function AdminImportPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentFile, setCurrentFile] = useState("")
   const [stats, setStats] = useState({ added: 0, updated: 0, total: 0, errors: 0 })
+  const [hasApiKeyError, setHasApiKeyError] = useState(false)
   const { toast } = useToast()
 
   const LOCAL_PATH = "D:\\OneDrivePARTNER\\KSeF_DEV\\FV_Zakupowe\\DANE"
@@ -65,11 +67,13 @@ export default function AdminImportPage() {
         if (result.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
         else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Błąd pliku ${file.name}:`, error)
       setStats(prev => ({ ...prev, errors: prev.errors + 1 }))
-      // Przerwa na oddech dla API przy błędzie
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      
+      if (error.message?.includes('API key') || error.message?.includes('FAILED_PRECONDITION')) {
+        setHasApiKeyError(true)
+      }
     }
   }
 
@@ -79,21 +83,25 @@ export default function AdminImportPage() {
 
     setIsUploading(true)
     setProgress(0)
+    setHasApiKeyError(false)
     setStats({ added: 0, updated: 0, total: files.length, errors: 0 })
 
     const fileList = Array.from(files)
+    // Sortujemy, aby najpierw przetworzyć XML (dają lepszą strukturę danych)
     const sortedFiles = fileList.sort((a, b) => {
       if (a.name.endsWith('.xml') && !b.name.endsWith('.xml')) return -1
       return 0
     })
 
     for (let i = 0; i < sortedFiles.length; i++) {
+      if (hasApiKeyError) break; // Przerwij jeśli klucz jest zły
+      
       await processFile(sortedFiles[i])
       
       const newProgress = Math.round(((i + 1) / sortedFiles.length) * 100)
       setProgress(newProgress)
       
-      // Wydłużone opóźnienie dla darmowego klucza Gemini
+      // Opóźnienie dla darmowego klucza Gemini (TPM/RPM limits)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
 
@@ -101,20 +109,30 @@ export default function AdminImportPage() {
     setCurrentFile("")
     toast({ 
       title: "Synchronizacja zakończona", 
-      description: `Zakończono przetwarzanie plików. Sprawdź wyniki w tabeli.` 
+      description: `Zakończono przetwarzanie plików.` 
     })
     event.target.value = ''
   }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {hasApiKeyError && (
+        <Alert variant="destructive" className="animate-bounce">
+          <Key className="h-4 w-4" />
+          <AlertTitle>Błąd klucza API</AlertTitle>
+          <AlertDescription>
+            System nie może połączyć się z AI. Upewnij się, że klucz <strong>GOOGLE_GENAI_API_KEY</strong> jest poprawnie ustawiony w konfiguracji projektu.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card className="border-none shadow-sm">
         <CardHeader>
           <CardTitle>Masowy Import (XML & PDF)</CardTitle>
           <CardDescription>
-            System przetwarza pliki sekwencyjnie. Jeśli napotkasz błędy, sprawdź konsolę przeglądarki (F12).<br/>
+            System przetwarza pliki sekwencyjnie. Wybierz pliki z lokalizacji:<br/>
             <code className="text-xs bg-slate-100 p-1 rounded mt-2 block font-mono">
-              Lokalizacja: {LOCAL_PATH}
+              {LOCAL_PATH}
             </code>
           </CardDescription>
         </CardHeader>
@@ -133,7 +151,7 @@ export default function AdminImportPage() {
             </div>
             <div className="text-center">
               <p className="font-semibold text-lg">Wybierz pliki do synchronizacji</p>
-              <p className="text-sm text-muted-foreground">Możesz zaznaczyć wszystkie 1000+ plików naraz.</p>
+              <p className="text-sm text-muted-foreground">Zaznacz wszystkie pliki XML i PDF naraz.</p>
             </div>
           </div>
 
@@ -144,7 +162,7 @@ export default function AdminImportPage() {
                   <span className="flex items-center gap-2">
                     {isUploading ? (
                       <>Przetwarzanie: <span className="text-primary truncate max-w-[250px]">{currentFile}</span></>
-                    ) : 'Zakończono synchronizację'}
+                    ) : 'Wynik synchronizacji'}
                   </span>
                   <span>{stats.added + stats.updated + stats.errors} / {stats.total}</span>
                 </div>
@@ -169,7 +187,7 @@ export default function AdminImportPage() {
                 <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3 border border-red-100">
                   <AlertCircle className="h-5 w-5 text-red-500" />
                   <div>
-                    <p className="text-[10px] text-red-600 font-semibold uppercase">Błędy</p>
+                    <p className="text-[10px] text-red-600 font-semibold uppercase">Błędy / Limity</p>
                     <p className="text-xl font-bold">{stats.errors}</p>
                   </div>
                 </div>
