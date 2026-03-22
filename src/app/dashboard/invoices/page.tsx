@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
@@ -23,7 +24,8 @@ import {
   Printer,
   Trash2,
   Edit2,
-  Save
+  Save,
+  CheckCircle2
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
@@ -32,7 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { useUser } from "@/firebase"
 import html2canvas from "html2canvas"
-import jsPDF from "jspdf"
+import jsPDF from "jsPDF"
 
 const PAGE_SIZE = 50
 
@@ -48,10 +50,8 @@ export default function InvoicesPage() {
   const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu']
   const isAdmin = user && adminEmails.includes(user.email || '')
   
-  // Edycja
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null)
   
-  // Filtry
   const [searchQuery, setSearchQuery] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -122,8 +122,6 @@ export default function InvoicesPage() {
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        width: invoiceRef.current.offsetWidth,
-        height: invoiceRef.current.offsetHeight,
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -135,22 +133,12 @@ export default function InvoicesPage() {
       const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
-
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(`Faktura_${invoiceNumber.replace(/\//g, '_')}.pdf`);
+      
       toast({ title: "Sukces", description: "Dokument PDF został wygenerowany." });
     } catch (err) {
+      console.error("PDF generation error:", err);
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się wygenerować PDF." });
     } finally {
       setIsExporting(false);
@@ -311,28 +299,161 @@ export default function InvoicesPage() {
                             </Button>
                           </div>
                         </DialogHeader>
+                        
                         <div className="p-10 flex justify-center bg-slate-200/40">
-                          <div id="printable-invoice" ref={invoiceRef} className="w-[210mm] bg-white p-16 shadow-2xl text-slate-800 font-sans border border-slate-300 relative">
+                          <div id="printable-invoice" ref={invoiceRef} className="w-[210mm] bg-white p-12 shadow-2xl text-slate-800 font-sans border border-slate-300 relative flex flex-col min-h-[297mm]">
+                            
+                            {/* Nagłówek Faktury */}
                             <div className="flex justify-between items-start border-b-8 border-primary pb-8 mb-10">
-                              <div><h1 className="text-5xl font-black text-primary tracking-tighter mb-2 uppercase">FAKTURA VAT</h1></div>
-                              <div className="text-right space-y-2"><p className="text-2xl font-black text-slate-700">Nr: {inv.invoiceNumber}</p><p className="text-xs">Data: {inv.invoiceDate}</p></div>
+                              <div>
+                                <h1 className="text-5xl font-black text-primary tracking-tighter mb-2 uppercase">
+                                  {inv.documentType || "FAKTURA VAT"}
+                                </h1>
+                                <p className="text-slate-500 font-medium">Oryginał</p>
+                              </div>
+                              <div className="text-right space-y-2">
+                                <p className="text-2xl font-black text-slate-700">Nr: {inv.invoiceNumber}</p>
+                                <div className="text-xs text-slate-500 space-y-1">
+                                  <p>Data wystawienia: <span className="font-bold text-slate-700">{inv.invoiceDate}</span></p>
+                                  <p>Data sprzedaży: <span className="font-bold text-slate-700">{inv.saleDate || inv.invoiceDate}</span></p>
+                                  <p>Termin płatności: <span className="font-bold text-slate-700">{inv.dueDate || "-"}</span></p>
+                                </div>
+                              </div>
                             </div>
+
+                            {/* Strony Transakcji */}
                             <div className="grid grid-cols-2 gap-12 mb-12">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase text-primary mb-3">Sprzedawca</p>
-                                    <p className="font-bold text-lg">{inv.sellerName}</p>
-                                    <p className="text-sm">{inv.seller?.addressL1}</p>
-                                    <p className="text-sm">{inv.seller?.addressL2}</p>
-                                    <p className="text-sm font-bold mt-1">NIP: {inv.sellerNip}</p>
+                              <div>
+                                <p className="text-[10px] font-bold uppercase text-primary mb-3 border-b pb-1">Sprzedawca</p>
+                                <p className="font-bold text-lg leading-tight mb-2">{inv.sellerName}</p>
+                                <div className="text-sm text-slate-600 space-y-0.5">
+                                  <p>{inv.seller?.addressL1}</p>
+                                  <p>{inv.seller?.addressL2}</p>
+                                  <p className="font-bold text-slate-900 mt-2">NIP: {inv.sellerNip}</p>
+                                  {inv.seller?.gln && <p className="text-xs">GLN: {inv.seller.gln}</p>}
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase text-primary mb-3">Nabywca</p>
-                                    <p className="font-bold text-lg">{inv.buyerName}</p>
-                                    <p className="text-sm">{inv.buyer?.addressL1}</p>
-                                    <p className="text-sm">{inv.buyer?.addressL2}</p>
-                                    <p className="text-sm font-bold mt-1">NIP: {inv.buyerNip}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold uppercase text-primary mb-3 border-b pb-1">Nabywca</p>
+                                <p className="font-bold text-lg leading-tight mb-2">{inv.buyerName}</p>
+                                <div className="text-sm text-slate-600 space-y-0.5">
+                                  <p>{inv.buyer?.addressL1}</p>
+                                  <p>{inv.buyer?.addressL2}</p>
+                                  <p className="font-bold text-slate-900 mt-2">NIP: {inv.buyerNip}</p>
                                 </div>
+                                {inv.recipient && (
+                                  <div className="mt-4 pt-4 border-t border-dashed">
+                                    <p className="text-[9px] font-bold uppercase text-slate-400 mb-1">Odbiorca</p>
+                                    <p className="font-bold text-xs">{inv.recipient.name}</p>
+                                    <p className="text-xs">{inv.recipient.addressL1}, {inv.recipient.addressL2}</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
+
+                            {/* Tabela Pozycji */}
+                            <div className="flex-1">
+                              <table className="w-full text-left border-collapse mb-10">
+                                <thead>
+                                  <tr className="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-y border-slate-200">
+                                    <th className="py-3 px-2 w-10 text-center">Lp.</th>
+                                    <th className="py-3 px-2">Nazwa towaru lub usługi</th>
+                                    <th className="py-3 px-2 text-right">Ilość</th>
+                                    <th className="py-3 px-2 text-center">J.m.</th>
+                                    <th className="py-3 px-2 text-right">Cena netto</th>
+                                    <th className="py-3 px-2 text-center">VAT</th>
+                                    <th className="py-3 px-2 text-right">Wartość netto</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                  {inv.items?.map((item: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-slate-100">
+                                      <td className="py-3 px-2 text-center text-slate-400">{idx + 1}</td>
+                                      <td className="py-3 px-2 font-medium">
+                                        {item.description}
+                                        {item.gtin && <p className="text-[10px] text-slate-400 font-mono mt-0.5">EAN: {item.gtin}</p>}
+                                      </td>
+                                      <td className="py-3 px-2 text-right">{item.quantity}</td>
+                                      <td className="py-3 px-2 text-center text-slate-500">szt.</td>
+                                      <td className="py-3 px-2 text-right">{item.unitPrice?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                      <td className="py-3 px-2 text-center">{item.vatRate}</td>
+                                      <td className="py-3 px-2 text-right font-semibold">{item.netValue?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Podsumowanie VAT i Kwoty */}
+                            <div className="flex justify-between gap-12 mb-12 mt-auto">
+                              <div className="w-1/2">
+                                <p className="text-[10px] font-bold uppercase text-slate-400 mb-2">Zestawienie VAT</p>
+                                <table className="w-full text-xs border border-slate-200">
+                                  <thead className="bg-slate-50">
+                                    <tr className="border-b border-slate-200">
+                                      <th className="p-2 text-left">Stawka</th>
+                                      <th className="p-2 text-right">Netto</th>
+                                      <th className="p-2 text-right">VAT</th>
+                                      <th className="p-2 text-right">Brutto</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {inv.vats?.map((v: any, i: number) => (
+                                      <tr key={i} className="border-b border-slate-100">
+                                        <td className="p-2 font-bold">{v.rate}</td>
+                                        <td className="p-2 text-right">{v.net?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                        <td className="p-2 text-right">{v.vat?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                        <td className="p-2 text-right">{(v.net + v.vat).toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-slate-50 font-bold">
+                                      <td className="p-2">Razem</td>
+                                      <td className="p-2 text-right">{inv.totalNet?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                      <td className="p-2 text-right">{inv.totalVat?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                      <td className="p-2 text-right">{inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                              
+                              <div className="text-right flex flex-col justify-end">
+                                <div className="bg-primary text-white p-6 rounded-xl shadow-inner min-w-[280px]">
+                                  <p className="text-xs font-bold uppercase opacity-80 mb-1">Do zapłaty</p>
+                                  <p className="text-4xl font-black">{inv.amountToPay?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Szczegóły Płatności */}
+                            <div className="grid grid-cols-2 gap-8 p-8 bg-slate-50 rounded-2xl border border-slate-100">
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Forma płatności</p>
+                                  <p className="font-bold text-slate-700">{inv.paymentMethod === '6' ? 'Przelew' : inv.paymentMethod || 'Przelew'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Termin płatności</p>
+                                  <p className="font-bold text-slate-700">{inv.dueDate} {inv.paymentTermDescription && `(${inv.paymentTermDescription})`}</p>
+                                </div>
+                              </div>
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Rachunek bankowy</p>
+                                  <p className="font-bold text-lg text-primary font-mono tracking-tighter">{inv.bankAccount || "-"}</p>
+                                  <p className="text-xs text-slate-500">{inv.bankName}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Stopka KSeF */}
+                            <div className="mt-12 flex items-center justify-between text-[8px] text-slate-400 uppercase tracking-widest border-t pt-4">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                <span>Dokument przetworzony przez KSeF Studio</span>
+                              </div>
+                              <div className="font-mono">ID: {inv.id}</div>
+                            </div>
+
                           </div>
                         </div>
                       </DialogContent>
