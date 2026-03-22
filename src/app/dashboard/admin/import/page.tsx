@@ -4,7 +4,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, CheckCircle2, RefreshCw } from "lucide-react"
+import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { parseKSeFXML } from "@/ai/flows/parse-ksef-xml-flow"
@@ -14,7 +14,8 @@ import { saveInvoice } from "@/lib/firestore"
 export default function AdminImportPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [stats, setStats] = useState({ added: 0, updated: 0, total: 0 })
+  const [currentFile, setCurrentFile] = useState("")
+  const [stats, setStats] = useState({ added: 0, updated: 0, total: 0, errors: 0 })
   const { toast } = useToast()
 
   const LOCAL_PATH = "D:\\OneDrivePARTNER\\KSeF_DEV\\FV_Zakupowe\\DANE"
@@ -28,78 +29,77 @@ export default function AdminImportPage() {
     })
   }
 
+  const processFile = async (file: File) => {
+    setCurrentFile(file.name)
+    try {
+      if (file.name.toLowerCase().endsWith('.xml')) {
+        const content = await file.text()
+        const parsedData = await parseKSeFXML(content)
+        const result = await saveInvoice({
+          ...parsedData,
+          sourceFile: file.name
+        })
+        
+        if (result.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
+        else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
+      } 
+      else if (file.name.toLowerCase().endsWith('.pdf')) {
+        const dataUri = await fileToBase64(file)
+        const extractedData = await extractPdfInvoiceData({ pdfDataUri: dataUri })
+        
+        const result = await saveInvoice({
+          ...extractedData,
+          sellerNip: extractedData.seller?.nip,
+          pdfDataUri: dataUri,
+          sourceFile: file.name
+        })
+
+        if (result.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
+        else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
+      }
+    } catch (error) {
+      console.error(`Błąd pliku ${file.name}:`, error)
+      setStats(prev => ({ ...prev, errors: prev.errors + 1 }))
+    }
+  }
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files || files.length === 0) return
 
     setIsUploading(true)
     setProgress(0)
-    
-    let addedCount = 0
-    let updatedCount = 0
-    const totalFiles = files.length
-    
-    setStats({ added: 0, updated: 0, total: totalFiles })
+    setStats({ added: 0, updated: 0, total: files.length, errors: 0 })
 
-    for (let i = 0; i < totalFiles; i++) {
-      const file = files[i]
-      console.log(`Przetwarzanie pliku: ${file.name}`)
+    const fileList = Array.from(files)
+    // Sortujemy: najpierw XML (szybsze), potem PDF
+    const sortedFiles = fileList.sort((a, b) => {
+      if (a.name.endsWith('.xml') && !b.name.endsWith('.xml')) return -1
+      if (!a.name.endsWith('.xml') && b.name.endsWith('.xml')) return 1
+      return 0
+    })
+
+    // Przetwarzanie w paczkach po 3 (optymalizacja pod rate limits)
+    const BATCH_SIZE = 3
+    for (let i = 0; i < sortedFiles.length; i += BATCH_SIZE) {
+      const batch = sortedFiles.slice(i, i + BATCH_SIZE)
+      await Promise.all(batch.map(file => processFile(file)))
       
-      try {
-        if (file.name.toLowerCase().endsWith('.xml')) {
-          const content = await file.text()
-          const parsedData = await parseKSeFXML(content)
-          const result = await saveInvoice({
-            ...parsedData,
-            sourceFile: file.name
-          })
-          
-          if (result.status === 'added') {
-            addedCount++
-            setStats(prev => ({ ...prev, added: prev.added + 1 }))
-          } else {
-            updatedCount++
-            setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
-          }
-        } 
-        else if (file.name.toLowerCase().endsWith('.pdf')) {
-          const dataUri = await fileToBase64(file)
-          const extractedData = await extractPdfInvoiceData({ pdfDataUri: dataUri })
-          
-          const result = await saveInvoice({
-            ...extractedData,
-            sellerNip: extractedData.seller.nip,
-            pdfDataUri: dataUri,
-            sourceFile: file.name
-          })
-
-          if (result.status === 'added') {
-            addedCount++
-            setStats(prev => ({ ...prev, added: prev.added + 1 }))
-          } else {
-            updatedCount++
-            setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
-          }
-        }
-        
-        setProgress(Math.round(((i + 1) / totalFiles) * 100))
-      } catch (error) {
-        console.error(`Błąd podczas przetwarzania ${file.name}:`, error)
-        toast({ 
-          variant: "destructive", 
-          title: "Błąd pliku", 
-          description: `Nie udało się przetworzyć ${file.name}` 
-        })
+      const newProgress = Math.round(((i + batch.length) / sortedFiles.length) * 100)
+      setProgress(newProgress)
+      
+      // Mała przerwa między paczkami, by oszczędzić API Gemini
+      if (i + BATCH_SIZE < sortedFiles.length) {
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
 
     setIsUploading(false)
+    setCurrentFile("")
     toast({ 
       title: "Synchronizacja zakończona", 
-      description: `Pomyślnie przetworzono ${addedCount + updatedCount} plików z ${totalFiles}.` 
+      description: `Przetworzono wszystkie pliki. Błędy: ${stats.errors}` 
     })
-    
-    // Resetuj input
     event.target.value = ''
   }
 
@@ -109,7 +109,7 @@ export default function AdminImportPage() {
         <CardHeader>
           <CardTitle>Masowy Import (XML & PDF)</CardTitle>
           <CardDescription>
-            Wybierz pliki z folderu lokalnego, aby zsynchronizować bazę danych. System automatycznie połączy dane XML z podglądem PDF.<br/>
+            System przetwarza teraz pliki w paczkach, aby uniknąć przeciążenia przy dużych wolumenach.<br/>
             <code className="text-xs bg-slate-100 p-1 rounded mt-2 block font-mono">
               Lokalizacja: {LOCAL_PATH}
             </code>
@@ -126,35 +126,48 @@ export default function AdminImportPage() {
               disabled={isUploading}
             />
             <div className="h-16 w-16 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
-              <RefreshCw className={`h-8 w-8 text-primary ${isUploading ? 'animate-spin' : ''}`} />
+              {isUploading ? <Loader2 className="h-8 w-8 text-primary animate-spin" /> : <RefreshCw className="h-8 w-8 text-primary" />}
             </div>
             <div className="text-center">
-              <p className="font-semibold text-lg">Zsynchronizuj pliki</p>
-              <p className="text-sm text-muted-foreground">Kliknij tutaj, zaznacz wszystkie pliki w folderze DANE i otwórz je.</p>
+              <p className="font-semibold text-lg">Wybierz pliki do synchronizacji</p>
+              <p className="text-sm text-muted-foreground">Możesz zaznaczyć wszystkie 1000+ plików naraz.</p>
             </div>
           </div>
 
           {(isUploading || stats.total > 0) && (
-            <div className="mt-8 space-y-4 animate-in fade-in duration-500">
-              <div className="flex justify-between text-sm font-medium">
-                <span>{isUploading ? 'Przetwarzanie dokumentów...' : 'Przetwarzanie zakończone'}</span>
-                <span>{stats.added + stats.updated} / {stats.total}</span>
+            <div className="mt-8 space-y-6 animate-in fade-in duration-500">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm font-medium">
+                  <span className="flex items-center gap-2">
+                    {isUploading ? (
+                      <>Przetwarzanie: <span className="text-primary truncate max-w-[250px]">{currentFile}</span></>
+                    ) : 'Zakończono synchronizację'}
+                  </span>
+                  <span>{stats.added + stats.updated + stats.errors} / {stats.total}</span>
+                </div>
+                <Progress value={progress} className="h-2 bg-slate-100" />
               </div>
-              <Progress value={progress} className="h-2 bg-slate-100" />
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-green-50 p-4 rounded-lg flex items-center gap-3 border border-green-100">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                   <div>
-                    <p className="text-xs text-green-600 font-semibold uppercase">Nowe w bazie</p>
+                    <p className="text-[10px] text-green-600 font-semibold uppercase">Nowe rekordy</p>
                     <p className="text-xl font-bold">{stats.added}</p>
                   </div>
                 </div>
                 <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3 border border-blue-100">
                   <FileText className="h-5 w-5 text-blue-500" />
                   <div>
-                    <p className="text-xs text-blue-600 font-semibold uppercase">Zaktualizowane / PDF</p>
+                    <p className="text-[10px] text-blue-600 font-semibold uppercase">Zaktualizowane / PDF</p>
                     <p className="text-xl font-bold">{stats.updated}</p>
+                  </div>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3 border border-red-100">
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                  <div>
+                    <p className="text-[10px] text-red-600 font-semibold uppercase">Błędy / Limity</p>
+                    <p className="text-xl font-bold">{stats.errors}</p>
                   </div>
                 </div>
               </div>
