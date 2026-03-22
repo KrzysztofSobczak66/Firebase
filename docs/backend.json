@@ -1,0 +1,673 @@
+{
+  "entities": {
+    "CompanyProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CompanyProfile",
+      "type": "object",
+      "description": "Represents the profile of the user's company, including identification, address, and contact details required for KSeF integration and invoice generation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CompanyProfile entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the external user's ID associated with this company profile. (Relationship: User 1:1 CompanyProfile)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The full legal name of the company."
+        },
+        "nip": {
+          "type": "string",
+          "description": "The Tax Identification Number (NIP) of the company, required for KSeF."
+        },
+        "regon": {
+          "type": "string",
+          "description": "The National Official Business Register Number (REGON) of the company."
+        },
+        "street": {
+          "type": "string",
+          "description": "The street name of the company's address."
+        },
+        "buildingNumber": {
+          "type": "string",
+          "description": "The building number of the company's address."
+        },
+        "flatNumber": {
+          "type": "string",
+          "description": "The flat or apartment number of the company's address (optional)."
+        },
+        "city": {
+          "type": "string",
+          "description": "The city of the company's address."
+        },
+        "postalCode": {
+          "type": "string",
+          "description": "The postal code of the company's address."
+        },
+        "country": {
+          "type": "string",
+          "description": "The country of the company's address."
+        },
+        "email": {
+          "type": "string",
+          "description": "The primary email address for company communication.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The primary phone number for company contact."
+        },
+        "bankAccountNumbers": {
+          "type": "array",
+          "description": "An array of bank account numbers used by the company.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contactPersonName": {
+          "type": "string",
+          "description": "The name of a primary contact person within the company (optional)."
+        },
+        "website": {
+          "type": "string",
+          "description": "The official website URL of the company (optional).",
+          "format": "uri"
+        },
+        "creationDate": {
+          "type": "string",
+          "description": "Timestamp when this company profile was created.",
+          "format": "date-time"
+        },
+        "lastUpdateDate": {
+          "type": "string",
+          "description": "Timestamp when this company profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "nip",
+        "regon",
+        "street",
+        "buildingNumber",
+        "city",
+        "postalCode",
+        "country",
+        "email",
+        "creationDate",
+        "lastUpdateDate"
+      ]
+    },
+    "CustomerVendor": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CustomerVendor",
+      "type": "object",
+      "description": "Represents a third-party entity that is either a customer (buyer) or a vendor (supplier) for the user's company.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CustomerVendor entity."
+        },
+        "companyProfileId": {
+          "type": "string",
+          "description": "Reference to the CompanyProfile that this customer/vendor is associated with. (Relationship: CompanyProfile 1:N CustomerVendor)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The legal name of the customer or vendor."
+        },
+        "nip": {
+          "type": "string",
+          "description": "The Tax Identification Number (NIP) of the customer or vendor (optional for individuals)."
+        },
+        "regon": {
+          "type": "string",
+          "description": "The National Official Business Register Number (REGON) of the customer or vendor (optional)."
+        },
+        "street": {
+          "type": "string",
+          "description": "The street name of the customer's or vendor's address."
+        },
+        "buildingNumber": {
+          "type": "string",
+          "description": "The building number of the customer's or vendor's address."
+        },
+        "flatNumber": {
+          "type": "string",
+          "description": "The flat or apartment number of the customer's or vendor's address (optional)."
+        },
+        "city": {
+          "type": "string",
+          "description": "The city of the customer's or vendor's address."
+        },
+        "postalCode": {
+          "type": "string",
+          "description": "The postal code of the customer's or vendor's address."
+        },
+        "country": {
+          "type": "string",
+          "description": "The country of the customer's or vendor's address."
+        },
+        "email": {
+          "type": "string",
+          "description": "The primary email address for communication with this customer or vendor (optional).",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The primary phone number for contact with this customer or vendor (optional)."
+        },
+        "isCustomer": {
+          "type": "boolean",
+          "description": "Indicates if this entity acts as a customer for the user's company."
+        },
+        "isVendor": {
+          "type": "boolean",
+          "description": "Indicates if this entity acts as a vendor for the user's company."
+        },
+        "creationDate": {
+          "type": "string",
+          "description": "Timestamp when this customer/vendor profile was created.",
+          "format": "date-time"
+        },
+        "lastUpdateDate": {
+          "type": "string",
+          "description": "Timestamp when this customer/vendor profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyProfileId",
+        "name",
+        "street",
+        "buildingNumber",
+        "city",
+        "postalCode",
+        "country",
+        "isCustomer",
+        "isVendor",
+        "creationDate",
+        "lastUpdateDate"
+      ]
+    },
+    "Invoice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Invoice",
+      "type": "object",
+      "description": "Represents a sales or purchase invoice, storing all necessary details for KSeF generation and internal tracking.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Invoice entity."
+        },
+        "companyProfileId": {
+          "type": "string",
+          "description": "Reference to the CompanyProfile that issued or received this invoice. (Relationship: CompanyProfile 1:N Invoice)"
+        },
+        "customerVendorId": {
+          "type": "string",
+          "description": "Reference to the CustomerVendor entity who is the counterparty of this invoice. (Relationship: CustomerVendor 1:N Invoice)"
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "description": "The unique, internal invoice number."
+        },
+        "invoiceType": {
+          "type": "string",
+          "description": "The type of invoice (e.g., 'SALES', 'PURCHASE', 'CORRECTION')."
+        },
+        "issueDate": {
+          "type": "string",
+          "description": "The date when the invoice was issued.",
+          "format": "date-time"
+        },
+        "saleDate": {
+          "type": "string",
+          "description": "The date of sale or service provision.",
+          "format": "date-time"
+        },
+        "paymentDueDate": {
+          "type": "string",
+          "description": "The date by which payment is due.",
+          "format": "date-time"
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency of the invoice (e.g., 'PLN', 'EUR', 'USD')."
+        },
+        "totalNet": {
+          "type": "number",
+          "description": "The total net amount of the invoice."
+        },
+        "totalVat": {
+          "type": "number",
+          "description": "The total VAT amount of the invoice."
+        },
+        "totalGross": {
+          "type": "number",
+          "description": "The total gross amount (net + VAT) of the invoice."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "The method of payment (e.g., 'BANK_TRANSFER', 'CASH', 'CARD')."
+        },
+        "status": {
+          "type": "string",
+          "description": "The internal status of the invoice (e.g., 'DRAFT', 'ISSUED', 'PAID', 'OVERDUE', 'CANCELLED')."
+        },
+        "ksefStatus": {
+          "type": "string",
+          "description": "The current status of the invoice in the KSeF system (e.g., 'PENDING_SUBMISSION', 'SUBMITTED', 'ACCEPTED', 'REJECTED', 'PROCESSING', 'ERROR')."
+        },
+        "ksefReferenceNumber": {
+          "type": "string",
+          "description": "The unique KSeF ID assigned upon successful submission to the KSeF system (optional)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes or comments for the invoice (optional)."
+        },
+        "ksefXmlDocumentFileId": {
+          "type": "string",
+          "description": "Reference to the DocumentFile containing the generated KSeF XML for this invoice (optional). (Relationship: Invoice 1:1 DocumentFile)"
+        },
+        "invoicePdfDocumentFileId": {
+          "type": "string",
+          "description": "Reference to the DocumentFile containing the human-readable PDF version of this invoice (optional). (Relationship: Invoice 1:1 DocumentFile)"
+        },
+        "ksefAcknowledgmentDocumentFileId": {
+          "type": "string",
+          "description": "Reference to the DocumentFile containing the KSeF Acknowledgment of Receipt (UPO) for this invoice (optional). (Relationship: Invoice 1:1 DocumentFile)"
+        },
+        "creationDate": {
+          "type": "string",
+          "description": "Timestamp when this invoice record was created.",
+          "format": "date-time"
+        },
+        "lastUpdateDate": {
+          "type": "string",
+          "description": "Timestamp when this invoice record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyProfileId",
+        "customerVendorId",
+        "invoiceNumber",
+        "invoiceType",
+        "issueDate",
+        "saleDate",
+        "paymentDueDate",
+        "currency",
+        "totalNet",
+        "totalVat",
+        "totalGross",
+        "paymentMethod",
+        "status",
+        "ksefStatus",
+        "creationDate",
+        "lastUpdateDate"
+      ]
+    },
+    "InvoiceItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InvoiceItem",
+      "type": "object",
+      "description": "Represents a single line item within an invoice, detailing a product or service.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the InvoiceItem entity."
+        },
+        "invoiceId": {
+          "type": "string",
+          "description": "Reference to the Invoice this item belongs to. (Relationship: Invoice 1:N InvoiceItem)"
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the product or service."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the item."
+        },
+        "unit": {
+          "type": "string",
+          "description": "The unit of measurement for the item (e.g., 'szt.', 'godz.', 'km')."
+        },
+        "netPricePerUnit": {
+          "type": "number",
+          "description": "The net price per unit of the item."
+        },
+        "totalNetPrice": {
+          "type": "number",
+          "description": "The total net price for this line item (quantity * netPricePerUnit)."
+        },
+        "vatRate": {
+          "type": "string",
+          "description": "The VAT rate applicable to this item (e.g., '23%', '8%', '0%', 'ZW' for exempt)."
+        },
+        "vatAmount": {
+          "type": "number",
+          "description": "The calculated VAT amount for this line item."
+        },
+        "grossPricePerUnit": {
+          "type": "number",
+          "description": "The gross price per unit of the item."
+        },
+        "totalGrossPrice": {
+          "type": "number",
+          "description": "The total gross price for this line item (totalNetPrice + vatAmount)."
+        },
+        "gtuCode": {
+          "type": "string",
+          "description": "The GTU (Grupa Towarowo-Usługowa) code applicable to this item for KSeF purposes (optional)."
+        }
+      },
+      "required": [
+        "id",
+        "invoiceId",
+        "description",
+        "quantity",
+        "unit",
+        "netPricePerUnit",
+        "totalNetPrice",
+        "vatRate",
+        "vatAmount",
+        "totalGrossPrice"
+      ]
+    },
+    "KSeFSubmissionLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "KSeFSubmissionLog",
+      "type": "object",
+      "description": "Logs the status and details of each KSeF submission attempt for an invoice, including responses from the KSeF API.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the KSeFSubmissionLog entity."
+        },
+        "invoiceId": {
+          "type": "string",
+          "description": "Reference to the Invoice associated with this KSeF submission. (Relationship: Invoice 1:N KSeFSubmissionLog)"
+        },
+        "companyProfileId": {
+          "type": "string",
+          "description": "Reference to the CompanyProfile that initiated this KSeF submission. (Relationship: CompanyProfile 1:N KSeFSubmissionLog)"
+        },
+        "submissionIdentifier": {
+          "type": "string",
+          "description": "A unique identifier for this particular submission attempt, often provided by KSeF."
+        },
+        "submissionDate": {
+          "type": "string",
+          "description": "Timestamp when the submission to KSeF was initiated.",
+          "format": "date-time"
+        },
+        "ksefApiEndpoint": {
+          "type": "string",
+          "description": "The KSeF API endpoint used for this submission.",
+          "format": "uri"
+        },
+        "currentStatus": {
+          "type": "string",
+          "description": "The current status of the KSeF submission (e.g., 'SENT', 'PROCESSING', 'ACCEPTED', 'REJECTED', 'ERROR')."
+        },
+        "statusCode": {
+          "type": "string",
+          "description": "The specific status code returned by the KSeF API."
+        },
+        "statusMessage": {
+          "type": "string",
+          "description": "A detailed message or explanation of the status from the KSeF API."
+        },
+        "fullResponse": {
+          "type": "string",
+          "description": "The complete raw response from the KSeF API for this submission (optional, stored as stringified JSON)."
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Indicates if this log entry represents a final status for the submission (e.g., accepted, rejected, or permanently failed)."
+        },
+        "relatedDocumentFileId": {
+          "type": "string",
+          "description": "Reference to a DocumentFile (e.g., KSeF acknowledgement XML) associated with this submission log (optional). (Relationship: KSeFSubmissionLog 1:1 DocumentFile)"
+        },
+        "creationDate": {
+          "type": "string",
+          "description": "Timestamp when this KSeF submission log entry was created.",
+          "format": "date-time"
+        },
+        "lastUpdateDate": {
+          "type": "string",
+          "description": "Timestamp when this KSeF submission log entry was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "invoiceId",
+        "companyProfileId",
+        "submissionIdentifier",
+        "submissionDate",
+        "ksefApiEndpoint",
+        "currentStatus",
+        "statusCode",
+        "statusMessage",
+        "isFinal",
+        "creationDate",
+        "lastUpdateDate"
+      ]
+    },
+    "DocumentFile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DocumentFile",
+      "type": "object",
+      "description": "Stores metadata about files (KSeF XML, PDF invoices, PZ TXT, etc.) uploaded to or generated by the system and stored in Firebase Storage.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DocumentFile entity."
+        },
+        "companyProfileId": {
+          "type": "string",
+          "description": "Reference to the CompanyProfile that owns this document file. (Relationship: CompanyProfile 1:N DocumentFile)"
+        },
+        "invoiceId": {
+          "type": "string",
+          "description": "Reference to an Invoice if this document is directly related to a specific invoice (optional). (Relationship: Invoice 1:1 DocumentFile)"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of document (e.g., 'KSEF_XML_SENT', 'INVOICE_PDF', 'PZ_TXT', 'ADMIN_UPLOAD_XML', 'KSEF_ACKNOWLEDGMENT_XML')."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "The original or designated file name of the document."
+        },
+        "storagePath": {
+          "type": "string",
+          "description": "The full path or key to the file within Firebase Storage."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "The MIME type of the file (e.g., 'application/xml', 'application/pdf', 'text/plain')."
+        },
+        "fileSizeKB": {
+          "type": "number",
+          "description": "The size of the file in kilobytes."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Timestamp when the document file was uploaded or generated.",
+          "format": "date-time"
+        },
+        "uploadedByUserId": {
+          "type": "string",
+          "description": "Reference to the external user's ID who uploaded or triggered the generation of this file."
+        },
+        "lastDownloadDate": {
+          "type": "string",
+          "description": "Timestamp when the document file was last downloaded (optional).",
+          "format": "date-time"
+        },
+        "metadata": {
+          "type": "string",
+          "description": "A JSON string storing arbitrary additional metadata relevant to the document (e.g., original filename, KSeF submission ID, processing status)."
+        }
+      },
+      "required": [
+        "id",
+        "companyProfileId",
+        "type",
+        "fileName",
+        "storagePath",
+        "mimeType",
+        "fileSizeKB",
+        "uploadDate",
+        "uploadedByUserId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}/companyProfile",
+        "definition": {
+          "entityName": "CompanyProfile",
+          "schema": {
+            "$ref": "#/backend/entities/CompanyProfile"
+          },
+          "description": "Represents the unique company profile for a user. Its document ID is 'companyProfile'. Includes denormalized 'userId' for authorization independence, matching the parent user path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns this company profile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/companyProfile/customerVendors/{customerVendorId}",
+        "definition": {
+          "entityName": "CustomerVendor",
+          "schema": {
+            "$ref": "#/backend/entities/CustomerVendor"
+          },
+          "description": "Represents a customer or vendor entity linked to a specific company profile. Includes denormalized 'userId' and 'companyProfileId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent company profile."
+            },
+            {
+              "name": "customerVendorId",
+              "description": "The unique identifier of the customer or vendor document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/companyProfile/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Represents a sales or purchase invoice for a company. Includes denormalized 'userId' and 'companyProfileId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent company profile."
+            },
+            {
+              "name": "invoiceId",
+              "description": "The unique identifier of the invoice document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/companyProfile/invoices/{invoiceId}/invoiceItems/{invoiceItemId}",
+        "definition": {
+          "entityName": "InvoiceItem",
+          "schema": {
+            "$ref": "#/backend/entities/InvoiceItem"
+          },
+          "description": "Represents a line item within an invoice. Includes denormalized 'userId', 'companyProfileId', and 'invoiceId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent company profile."
+            },
+            {
+              "name": "invoiceId",
+              "description": "The unique identifier of the parent invoice document."
+            },
+            {
+              "name": "invoiceItemId",
+              "description": "The unique identifier of the invoice item document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/companyProfile/invoices/{invoiceId}/ksefSubmissionLogs/{logId}",
+        "definition": {
+          "entityName": "KSeFSubmissionLog",
+          "schema": {
+            "$ref": "#/backend/entities/KSeFSubmissionLog"
+          },
+          "description": "Logs KSeF submission attempts for an invoice. Includes denormalized 'userId', 'companyProfileId', and 'invoiceId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent company profile."
+            },
+            {
+              "name": "invoiceId",
+              "description": "The unique identifier of the parent invoice document."
+            },
+            {
+              "name": "logId",
+              "description": "The unique identifier of the KSeF submission log document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/companyProfile/documentFiles/{documentFileId}",
+        "definition": {
+          "entityName": "DocumentFile",
+          "schema": {
+            "$ref": "#/backend/entities/DocumentFile"
+          },
+          "description": "Stores metadata for files owned by a company profile. Includes denormalized 'userId' (as 'uploadedByUserId') and 'companyProfileId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent company profile."
+            },
+            {
+              "name": "documentFileId",
+              "description": "The unique identifier of the document file metadata document."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to strictly adhere to the core design principles, especially Authorization Independence and QAPs (Query as you are Authorized), by leveraging a hierarchical path structure combined with strategic denormalization. All user-specific and company-related data is nested under a user's unique path, effectively segmenting data ownership and simplifying security rules.\n\n**Authorization Independence via Denormalization:**\nEach document below the `/users/{userId}/companyProfile` path explicitly includes `userId` and `companyProfileId` fields. For `InvoiceItem` and `KSeFSubmissionLog`, `invoiceId` is also denormalized. This eliminates the need for `get()` operations in Firestore security rules to check parent ownership. For example, to verify access to an `InvoiceItem`, rules can simply check `request.auth.uid == resource.data.userId` and `request.auth.uid == /{userId}/` segment in the path. This allows atomic write operations (transactions/batches) without complex `get()` dependencies and makes rules robust and easy to debug.\n\n**QAPs (Query as you are Authorized):**\nThe entire structure is rooted at `/users/{userId}/...`. This inherently enforces QAPs. When a user queries any collection or subcollection (e.g., `/users/{request.auth.uid}/companyProfile/invoices`), Firestore's security rules can directly compare `request.auth.uid` with the `{userId}` wildcard in the path and the `userId` field within the document. This ensures that a user can only query and list data that belongs to them or their associated company profile, as the queries must begin with their authenticated UID. There's no mixing of data with different security postures within the same collection. For instance, all invoices under a specific company profile are accessible to that company's owner, not to others. This segregation of data based on ownership makes `list` operations implicitly secure without relying on rule-based filtering, which is inefficient and insecure.\n\n**Structural Segregation:**\nAll documents within a given subcollection (e.g., `customerVendors`, `invoices`, `documentFiles`) share the same security requirements: ownership by the parent `CompanyProfile`'s `userId`. There are no public/private data mixed within these collections, further simplifying security rules and reducing the risk of accidental data exposure.\n\n**Access Modeling:**\nPrivate data ownership is clearly established via path-based ownership (`/users/{userId}/...`). All data related to a user's company and its operations (customer/vendors, invoices, files, logs) is directly nested under their specific user ID, creating a clear and consistent hierarchy of ownership."
+  }
+}
