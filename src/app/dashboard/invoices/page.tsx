@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
@@ -247,6 +248,7 @@ export default function InvoicesPage() {
               </TableHead>
               <TableHead>Sprzedawca / NIP</TableHead>
               <TableHead>Nabywca / NIP</TableHead>
+              <TableHead>Odbiorca / NIP</TableHead>
               <TableHead onClick={() => handleSort('totalNet')} className="text-right cursor-pointer group">
                 Wartość Netto <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
               </TableHead>
@@ -259,7 +261,7 @@ export default function InvoicesPage() {
           <TableBody>
             {paginatedInvoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Brak faktur spełniających kryteria.</TableCell>
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">Brak faktur spełniających kryteria.</TableCell>
               </TableRow>
             ) : paginatedInvoices.map((inv) => (
               <TableRow key={inv.id} className="hover:bg-slate-50 transition-colors">
@@ -267,14 +269,20 @@ export default function InvoicesPage() {
                 <TableCell className="text-xs">{inv.invoiceDate}</TableCell>
                 <TableCell>
                   <div className="text-[10px] leading-tight">
-                    <p className="font-bold text-slate-700 truncate max-w-[180px]">{inv.sellerName}</p>
+                    <p className="font-bold text-slate-700 truncate max-w-[150px]">{inv.sellerName}</p>
                     <p className="text-muted-foreground font-mono">{inv.sellerNip}</p>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="text-[10px] leading-tight">
-                    <p className="font-bold text-slate-700 truncate max-w-[180px]">{inv.buyerName}</p>
+                    <p className="font-bold text-slate-700 truncate max-w-[150px]">{inv.buyerName}</p>
                     <p className="text-muted-foreground font-mono">{inv.buyerNip}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-[10px] leading-tight">
+                    <p className="font-bold text-slate-700 truncate max-w-[150px]">{inv.recipient?.name || "-"}</p>
+                    <p className="text-muted-foreground font-mono">{inv.recipient?.nip || ""}</p>
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-bold text-slate-700">
