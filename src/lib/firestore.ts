@@ -53,10 +53,19 @@ function saveToLocal(invoice: any) {
   const current = getLocalInvoices();
   const existingIndex = current.findIndex((inv: any) => inv.invoiceNumber === invoice.invoiceNumber);
   
+  const invoiceWithMeta = {
+    ...invoice,
+    updatedAt: new Date().toISOString()
+  };
+
   if (existingIndex >= 0) {
-    current[existingIndex] = { ...current[existingIndex], ...invoice, updatedAt: new Date().toISOString() };
+    current[existingIndex] = { ...current[existingIndex], ...invoiceWithMeta };
   } else {
-    current.push({ ...invoice, id: 'local-' + Date.now() + Math.random().toString(36).substr(2, 5), createdAt: new Date().toISOString() });
+    current.push({ 
+      ...invoiceWithMeta, 
+      id: 'local-' + Date.now() + Math.random().toString(36).substr(2, 5), 
+      createdAt: new Date().toISOString() 
+    });
   }
   
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(current));
@@ -132,9 +141,15 @@ export async function getAllInvoices() {
       ...doc.data()
     }));
     
-    return [...firestoreInvoices, ...localInvoices.filter((l: any) => 
-      !firestoreInvoices.some(f => f.invoiceNumber === l.invoiceNumber)
-    )];
+    // Merge local and firestore, prioritizing firestore version if numbers match
+    const merged = [...firestoreInvoices];
+    localInvoices.forEach((localInv: any) => {
+      if (!merged.some(f => f.invoiceNumber === localInv.invoiceNumber)) {
+        merged.push(localInv);
+      }
+    });
+    
+    return merged;
   } catch (error) {
     console.error("Błąd pobierania faktur:", error);
     return localInvoices;
@@ -154,19 +169,28 @@ export async function deleteInvoice(id: string) {
 }
 
 export async function deleteAllInvoices() {
+  // Clear local storage first (reliable)
   if (typeof window !== 'undefined') {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
+    console.log("Local storage cleared.");
   }
 
-  if (!isFirebaseConfigured) return;
+  // Clear firestore if configured
+  if (!isFirebaseConfigured) {
+    return true;
+  }
 
   try {
     const querySnapshot = await getDocs(collection(db, "invoices"));
+    if (querySnapshot.empty) return true;
+
     const batch = writeBatch(db);
     querySnapshot.docs.forEach((d) => {
       batch.delete(doc(db, "invoices", d.id));
     });
     await batch.commit();
+    console.log("Firestore collection cleared.");
+    return true;
   } catch (error) {
     console.error("Błąd podczas czyszczenia bazy danych:", error);
     throw error;

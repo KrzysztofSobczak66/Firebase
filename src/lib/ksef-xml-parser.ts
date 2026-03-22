@@ -36,7 +36,9 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
-      const el = parent.getElementsByTagNameNS("*", tagName)[0] || parent.getElementsByTagName(tagName)[0];
+      // Spróbuj z przestrzenią nazw, potem bez
+      const el = parent.getElementsByTagNameNS("*", tagName)[0] || 
+                 parent.getElementsByTagName(tagName)[0];
       return el ? el.textContent?.trim() || "" : "";
     };
 
@@ -61,16 +63,21 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     // Pobieranie sekcji Fa dla precyzyjniejszego wyszukiwania wierszy
     const faSection = xmlDoc.getElementsByTagNameNS("*", "Fa")[0] || xmlDoc.getElementsByTagName("Fa")[0];
     
-    // Kluczowe: wyszukiwanie FaWiersz w całym dokumencie lub sekcji Fa
+    // Szukamy wierszy faktury (FaWiersz)
     const wierszeEls = getEls("FaWiersz", faSection || xmlDoc);
     
     const items: InvoiceItem[] = wierszeEls.map(w => {
+      const qStr = getVal("P_8B", w).replace(",", ".");
+      const pStr = getVal("P_9A", w).replace(",", ".");
+      const nStr = getVal("P_11", w).replace(",", ".");
+      const vStr = getVal("P_11Vat", w).replace(",", ".");
+      
       return {
         description: getVal("P_7", w),
-        quantity: parseFloat(getVal("P_8B", w).replace(",", ".")) || 0,
-        unitPrice: parseFloat(getVal("P_9A", w).replace(",", ".")) || 0,
-        netValue: parseFloat(getVal("P_11", w).replace(",", ".")) || 0,
-        vatValue: parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0,
+        quantity: parseFloat(qStr) || 0,
+        unitPrice: parseFloat(pStr) || 0,
+        netValue: parseFloat(nStr) || 0,
+        vatValue: parseFloat(vStr) || 0,
         vatRate: getVal("P_12", w) ? getVal("P_12", w) + "%" : "23%"
       };
     });
@@ -78,14 +85,18 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const p13_1 = parseFloat(getVal("P_13_1").replace(",", ".")) || 0;
     const p13_2 = parseFloat(getVal("P_13_2").replace(",", ".")) || 0;
     const p13_3 = parseFloat(getVal("P_13_3").replace(",", ".")) || 0;
-    const sumNet = p13_1 + p13_2 + p13_3;
-                   
+    
     const p14_1 = parseFloat(getVal("P_14_1").replace(",", ".")) || 0;
     const p14_2 = parseFloat(getVal("P_14_2").replace(",", ".")) || 0;
     const p14_3 = parseFloat(getVal("P_14_3").replace(",", ".")) || 0;
-    const sumVat = p14_1 + p14_2 + p14_3;
 
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
+    const sumNet = p13_1 + p13_2 + p13_3;
+    const sumVat = p14_1 + p14_2 + p14_3;
+
+    // Jeżeli nie ma sum w polach P_13_x, spróbuj policzyć z wierszy
+    const calculatedNet = items.reduce((sum, item) => sum + item.netValue, 0);
+    const calculatedVat = items.reduce((sum, item) => sum + item.vatValue, 0);
 
     const data: ParsedKSeF = {
       invoiceNumber: getVal("P_2"),
@@ -97,9 +108,9 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       buyerName: podmiot2 ? getVal("Nazwa", podmiot2) : "",
       buyerNip: podmiot2 ? getVal("NIP", podmiot2) : "",
       buyerAddress: getAddress(podmiot2 as Element),
-      totalNet: sumNet || (gross - sumVat),
-      totalVat: sumVat,
-      totalGross: gross,
+      totalNet: sumNet || calculatedNet || (gross - (sumVat || calculatedVat)),
+      totalVat: sumVat || calculatedVat,
+      totalGross: gross || (calculatedNet + calculatedVat),
       currency: getVal("KodWaluty") || "PLN",
       items
     };

@@ -13,8 +13,8 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
-import { Lock, Trash2, Edit, Save, X, ShieldAlert, Loader2, AlertTriangle } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+import { Lock, Trash2, Edit, Save, X, ShieldAlert, Loader2, AlertTriangle, RefreshCw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, updateInvoice, deleteAllInvoices } from "@/lib/firestore"
 
 export default function AdminPage() {
@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [clearing, setClearing] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<any>({})
+  const { toast } = useToast()
 
   const fetchInvoices = async () => {
     setLoading(true)
@@ -63,7 +64,7 @@ export default function AdminPage() {
     
     try {
       await deleteInvoice(id)
-      setInvoices(invoices.filter(inv => inv.id !== id))
+      setInvoices(prev => prev.filter(inv => inv.id !== id))
       toast({ title: "Usunięto", description: "Faktura została usunięta z bazy." })
     } catch (error) {
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
@@ -71,15 +72,26 @@ export default function AdminPage() {
   }
 
   const handleClearAll = async () => {
-    if (!confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy (Firestore i LocalStorage)? Te operacji nie da się cofnąć.")) return
+    const isConfirmed = confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy (Firestore i LocalStorage)? Te operacji nie da się cofnąć.")
+    if (!isConfirmed) return
     
     setClearing(true)
+    console.log("Starting database cleanup...");
+    
     try {
       await deleteAllInvoices()
       setInvoices([])
-      toast({ title: "Baza wyczyszczona", description: "Wszystkie rekordy zostały usunięte." })
-    } catch (error) {
-      toast({ variant: "destructive", title: "Błąd", description: "Wystąpił błąd podczas czyszczenia bazy." })
+      toast({ 
+        title: "Baza wyczyszczona", 
+        description: "Wszystkie rekordy zostały usunięte z pamięci lokalnej i chmury." 
+      })
+    } catch (error: any) {
+      console.error("Cleanup error:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Błąd czyszczenia", 
+        description: error.message || "Wystąpił błąd podczas czyszczenia bazy." 
+      })
     } finally {
       setClearing(false)
     }
@@ -147,10 +159,16 @@ export default function AdminPage() {
           <p className="text-muted-foreground">Usuwanie i edycja faktur z bazy Firestore oraz pamięci lokalnej.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchInvoices} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Odśwież"}
+          <Button variant="outline" onClick={fetchInvoices} disabled={loading || clearing}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Odśwież
           </Button>
-          <Button variant="destructive" className="bg-red-600 hover:bg-red-700" onClick={handleClearAll} disabled={clearing || invoices.length === 0}>
+          <Button 
+            variant="destructive" 
+            className="bg-red-600 hover:bg-red-700" 
+            onClick={handleClearAll} 
+            disabled={clearing}
+          >
             {clearing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
             Wyczyść całą bazę
           </Button>
@@ -175,7 +193,7 @@ export default function AdminPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && invoices.length === 0 ? (
+              {loading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary opacity-50" />
