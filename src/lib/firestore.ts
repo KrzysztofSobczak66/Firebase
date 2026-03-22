@@ -9,7 +9,8 @@ import {
   updateDoc, 
   getFirestore,
   limit,
-  writeBatch
+  writeBatch,
+  setDoc
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { initializeFirebase } from "@/firebase";
@@ -17,19 +18,10 @@ import { initializeFirebase } from "@/firebase";
 const { firebaseApp, firestore: db } = initializeFirebase();
 
 const LOCAL_STORAGE_KEY = 'ksef_invoices_local_db';
+const INVOICES_COLLECTION = "invoices";
 
-// Pomocnicza funkcja do pobierania UID aktualnego użytkownika
-function getCurrentUserId() {
-  const auth = getAuth(firebaseApp);
-  return auth.currentUser?.uid;
-}
-
-// Ścieżka do kolekcji faktur użytkownika - poprawiona na 3 segmenty (kolekcja/dokument/kolekcja)
-function getUserInvoicesPath() {
-  const uid = getCurrentUserId();
-  if (!uid) return null;
-  return `users/${uid}/invoices`;
-}
+// Lista administratorów
+const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu'];
 
 function getLocalInvoices() {
   if (typeof window === 'undefined') return [];
@@ -37,42 +29,12 @@ function getLocalInvoices() {
   return stored ? JSON.parse(stored) : [];
 }
 
-function saveToLocal(invoice: any) {
-  if (typeof window === 'undefined') return;
-  const current = getLocalInvoices();
-  const existingIndex = current.findIndex((inv: any) => inv.invoiceNumber === invoice.invoiceNumber);
-  
-  const invoiceWithMeta = {
-    ...invoice,
-    updatedAt: new Date().toISOString()
-  };
-
-  if (existingIndex >= 0) {
-    current[existingIndex] = { ...current[existingIndex], ...invoiceWithMeta };
-  } else {
-    current.push({ 
-      ...invoiceWithMeta, 
-      id: 'local-' + Date.now() + Math.random().toString(36).substr(2, 5), 
-      createdAt: new Date().toISOString() 
-    });
-  }
-  
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(current));
-}
-
 export async function findInvoiceByDetails(invoiceNumber: string) {
   if (!invoiceNumber) return null;
   
-  const local = getLocalInvoices();
-  const foundLocal = local.find((inv: any) => inv.invoiceNumber === invoiceNumber);
-  if (foundLocal) return foundLocal;
-
-  const path = getUserInvoicesPath();
-  if (!path) return null;
-  
   try {
     const q = query(
-      collection(db, path), 
+      collection(db, INVOICES_COLLECTION), 
       where("invoiceNumber", "==", invoiceNumber),
       limit(1)
     );
@@ -86,35 +48,33 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
 }
 
 export async function saveInvoice(invoiceData: any) {
-  const path = getUserInvoicesPath();
-  
-  if (!path) {
-    saveToLocal(invoiceData);
-    return { status: 'added', id: 'local-id' };
-  }
-
   try {
+    const auth = getAuth(firebaseApp);
+    const user = auth.currentUser;
+    const isAdmin = user && adminEmails.includes(user.email || '');
+
+    // Tylko admin może zapisywać w Firebase
+    if (!isAdmin) {
+      throw new Error("Brak uprawnień do zapisu.");
+    }
+
     const existing = await findInvoiceByDetails(invoiceData.invoiceNumber);
     
-    const uid = getCurrentUserId();
-    const dataWithUser = {
+    const dataToSave = {
       ...invoiceData,
-      userId: uid
+      lastModifiedBy: user.email,
+      updatedAt: new Date().toISOString()
     };
 
-    if (existing && !existing.id.startsWith('local-')) {
-      const docRef = doc(db, path, existing.id);
-      await updateDoc(docRef, {
-        ...dataWithUser,
-        updatedAt: new Date().toISOString()
-      });
+    if (existing) {
+      const docRef = doc(db, INVOICES_COLLECTION, existing.id);
+      await updateDoc(docRef, dataToSave);
       return { status: 'updated', id: existing.id };
     }
 
-    const docRef = await addDoc(collection(db, path), {
-      ...dataWithUser,
+    const docRef = await addDoc(collection(db, INVOICES_COLLECTION), {
+      ...dataToSave,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       status: 'ACCEPTED'
     });
     return { status: 'added', id: docRef.id };
@@ -125,55 +85,42 @@ export async function saveInvoice(invoiceData: any) {
 }
 
 export async function getAllInvoices() {
-  const localInvoices = getLocalInvoices();
-  const path = getUserInvoicesPath();
-  
-  if (!path) {
-    return localInvoices;
-  }
-
   try {
-    const querySnapshot = await getDocs(collection(db, path));
-    const firestoreInvoices = querySnapshot.docs.map(doc => ({
+    const querySnapshot = await getDocs(collection(db, INVOICES_COLLECTION));
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
-    return firestoreInvoices;
   } catch (error) {
     console.error("Błąd pobierania faktur:", error);
-    return localInvoices;
+    return getLocalInvoices();
   }
 }
 
 export async function deleteInvoice(id: string) {
-  const path = getUserInvoicesPath();
-  if (id.startsWith('local-')) {
-    const current = getLocalInvoices();
-    const updated = current.filter((inv: any) => inv.id !== id);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-    return;
-  }
+  const auth = getAuth(firebaseApp);
+  const user = auth.currentUser;
+  const isAdmin = user && adminEmails.includes(user.email || '');
 
-  if (!path) return;
-  await deleteDoc(doc(db, path, id));
+  if (!isAdmin) throw new Error("Brak uprawnień.");
+
+  await deleteDoc(doc(db, INVOICES_COLLECTION, id));
 }
 
 export async function deleteAllInvoices() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-  }
+  const auth = getAuth(firebaseApp);
+  const user = auth.currentUser;
+  const isAdmin = user && adminEmails.includes(user.email || '');
 
-  const path = getUserInvoicesPath();
-  if (!path) return true;
+  if (!isAdmin) throw new Error("Brak uprawnień.");
 
   try {
-    const querySnapshot = await getDocs(collection(db, path));
+    const querySnapshot = await getDocs(collection(db, INVOICES_COLLECTION));
     if (querySnapshot.empty) return true;
 
     const batch = writeBatch(db);
     querySnapshot.docs.forEach((d) => {
-      batch.delete(doc(db, path, d.id));
+      batch.delete(doc(db, INVOICES_COLLECTION, d.id));
     });
     await batch.commit();
     return true;

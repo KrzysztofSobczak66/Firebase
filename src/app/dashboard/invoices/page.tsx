@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
@@ -198,8 +197,6 @@ export default function InvoicesPage() {
     const start = (currentPage - 1) * PAGE_SIZE
     return sortedInvoices.slice(start, start + PAGE_SIZE)
   }, [sortedInvoices, currentPage])
-
-  const totalPages = Math.ceil(sortedInvoices.length / PAGE_SIZE)
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' | null = 'asc'

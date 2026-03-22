@@ -7,24 +7,32 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@ksef.pl' || 
+        request.auth.token.email == 'krzysztof.sobczak@sp-partner.eu'
+      );
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     // --- RULES ---
 
-    // Publiczne profile użytkowników (do zarządzania przez administratora)
+    // Profile użytkowników - admin widzi wszystkich, użytkownik tylko siebie
     match /userProfiles/{userId} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin() || isOwner(userId);
       allow write: if isOwner(userId);
     }
 
-    // Faktury użytkowników - uproszczona i poprawna ścieżka
-    match /users/{userId}/invoices/{invoiceId} {
-      allow read, write: if isOwner(userId);
+    // Globalna kolekcja faktur
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
     
-    // Fallback dla pozostałych ścieżek
+    // Fallback
     match /{document=**} {
       allow read, write: if false;
     }
