@@ -26,7 +26,8 @@ import {
   CreditCard,
   ChevronRight,
   Github,
-  Info
+  Info,
+  AlertCircle
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
@@ -162,56 +163,56 @@ export default function AdminPage() {
                 <Globe className="h-5 w-5" /> Udostępnianie w sieci
               </CardTitle>
               <CardDescription>
-                Dokończ konfigurację w konsoli Firebase:
+                Rozwiązanie problemów z wdrożeniem (Deployment settings):
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-4">
               
+              <div className="space-y-2 p-4 bg-red-50 rounded-lg border border-red-200">
+                <p className="font-bold text-red-800 flex items-center gap-2 text-xs">
+                  <AlertCircle className="h-4 w-4" /> BŁĄD: INVALID BRANCH NAME?
+                </p>
+                <p className="text-red-700 text-[11px] leading-relaxed">
+                  Jeśli widzisz błąd <b>"Branch name must refer to a valid existing branch"</b>:
+                  <br />- Zamiast <code className="bg-red-100 px-1 rounded">firebase</code> wpisz <b>main</b>.
+                  <br />- To Twoja domyślna gałąź kodu.
+                </p>
+              </div>
+
               <div className="space-y-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
                 <p className="font-bold text-amber-800 flex items-center gap-2 text-xs">
                   <Info className="h-4 w-4" /> PROBLEM Z PRZYCISKIEM SAVE?
                 </p>
                 <p className="text-amber-700 text-[11px] leading-relaxed">
-                  Jeśli przycisk <b>Save</b> na GitHubie jest szary/niedostępny:
-                  <br />- Wybierz opcję <b>"Only select repositories"</b> zamiast "All repositories".
+                  Jeśli przycisk <b>Save</b> na GitHubie jest szary:
+                  <br />- Wybierz opcję <b>"Only select repositories"</b>.
                   <br />- Z listy wybierz repozytorium o nazwie <b>studio-project</b>.
-                  <br />- Przycisk powinien się aktywować!
                 </p>
               </div>
 
               <div className="space-y-3 mt-4">
-                <p className="font-bold text-slate-900">KROKI DO WDROŻENIA:</p>
+                <p className="font-bold text-slate-900">OSTATNIE KROKI:</p>
                 <ol className="space-y-3 text-[12px]">
                   <li className="flex gap-2">
                     <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">1</span>
-                    <span>Po kliknięciu <b>Save</b> wróć do konsoli Firebase.</span>
+                    <span>W polu <b>Live branch</b> wpisz: <b className="text-primary">main</b></span>
                   </li>
                   <li className="flex gap-2">
                     <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">2</span>
-                    <span>Wybierz repozytorium <b>studio-project</b> z listy w Firebase.</span>
+                    <span>Pole <b>App root directory</b> pozostaw puste: <b>/</b></span>
                   </li>
                   <li className="flex gap-2">
                     <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">3</span>
-                    <span>Ustaw nazwę (np. <b>ksef-studio</b>) i gałąź <b>main</b>.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">4</span>
-                    <span>Kliknij <b>Deploy</b> i poczekaj ok. 5 minut.</span>
+                    <span>Kliknij <b>Deploy</b> i poczekaj na zakończenie budowania.</span>
                   </li>
                 </ol>
               </div>
               
-              <div className="p-4 bg-white rounded-lg border border-primary/20 mt-4">
-                <p className="text-xs font-bold text-primary mb-2 flex items-center gap-2">
-                  <LayoutDashboard className="h-3 w-3" /> Masz trudności?
-                </p>
-                <p className="text-[11px] mb-3 text-slate-500">Po wdrożeniu otrzymasz publiczny link, który będzie działał dla wszystkich.</p>
-                <Button variant="default" className="w-full bg-primary h-9" asChild>
-                  <a href="https://console.firebase.google.com/project/studio-4075507772-6bfaa/apphosting" target="_blank" rel="noopener noreferrer">
-                    Wróć do Konsoli Firebase <ExternalLink className="h-3 w-3 ml-2" />
-                  </a>
-                </Button>
-              </div>
+              <Button variant="default" className="w-full bg-primary h-10 mt-4" asChild>
+                <a href="https://console.firebase.google.com/project/studio-4075507772-6bfaa/apphosting" target="_blank" rel="noopener noreferrer">
+                  Wróć do Konsoli Firebase <ExternalLink className="h-3 w-3 ml-2" />
+                </a>
+              </Button>
             </CardContent>
           </Card>
 
