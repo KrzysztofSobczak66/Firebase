@@ -12,7 +12,16 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
-import { Trash2, ShieldAlert, Loader2, AlertTriangle, RefreshCw, UserPlus } from "lucide-react"
+import { 
+  Trash2, 
+  ShieldAlert, 
+  Loader2, 
+  AlertTriangle, 
+  RefreshCw, 
+  Globe,
+  ExternalLink,
+  ShieldCheck
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
 import { useUser } from "@/firebase"
@@ -65,12 +74,12 @@ export default function AdminPage() {
   }
 
   const handleClearAll = async () => {
-    if (!confirm("OSTRZEŻENIE: Ta operacja nieodwracalnie usunie WSZYSTKIE Twoje faktury. Kontynuować?")) return
+    if (!confirm("OSTRZEŻENIE: Ta operacja nieodwracalnie usunie WSZYSTKIE faktury z bazy danych. Kontynuować?")) return
     setActionInProgress(true)
     try {
       await deleteAllInvoices()
       setInvoices([])
-      toast({ title: "Baza wyczyszczona", description: "Wszystkie Twoje rekordy zostały usunięte." })
+      toast({ title: "Baza wyczyszczona", description: "Wszystkie rekordy zostały usunięte." })
     } catch (error: any) {
       toast({ variant: "destructive", title: "Błąd", description: "Wystąpił problem przy czyszczeniu bazy." })
     } finally {
@@ -87,23 +96,23 @@ export default function AdminPage() {
           <h2 className="text-3xl font-black flex items-center gap-3 text-slate-900">
             <ShieldAlert className="h-8 w-8 text-destructive" /> Panel Administratora
           </h2>
-          <p className="text-slate-500">Zarządzanie bazą danych i użytkownikami.</p>
+          <p className="text-slate-500">Zarządzanie systemem i wdrożeniem sieciowym.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchInvoices} disabled={loading || actionInProgress}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Odśwież
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Odśwież listę
           </Button>
           <Button variant="destructive" onClick={handleClearAll} disabled={actionInProgress || loading} className="font-bold">
-            <AlertTriangle className="h-4 w-4 mr-2" /> Wyczyść Bazę
+            <AlertTriangle className="h-4 w-4 mr-2" /> Wyczyść Całą Bazę
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 border-none shadow-sm overflow-hidden bg-white">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 border-none shadow-sm overflow-hidden bg-white">
           <CardHeader className="bg-slate-50 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-widest text-slate-500">
-              Twoje rekordy ({invoices.length})
+              Przegląd rekordów w bazie ({invoices.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -113,7 +122,7 @@ export default function AdminPage() {
                   <TableHead>Numer Faktury</TableHead>
                   <TableHead>Sprzedawca</TableHead>
                   <TableHead className="text-right">Brutto</TableHead>
-                  <TableHead className="text-center w-[80px]">Usuń</TableHead>
+                  <TableHead className="text-center w-[80px]">Akcje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -125,8 +134,8 @@ export default function AdminPage() {
                   invoices.map((inv) => (
                     <TableRow key={inv.id} className="hover:bg-slate-50/50">
                       <TableCell className="font-bold text-slate-700">{inv.invoiceNumber}</TableCell>
-                      <TableCell><div className="max-w-[150px] truncate">{inv.sellerName}</div></TableCell>
-                      <TableCell className="text-right font-black text-slate-900">{inv.totalGross?.toLocaleString('pl-PL')} {inv.currency}</TableCell>
+                      <TableCell><div className="max-w-[200px] truncate">{inv.sellerName}</div></TableCell>
+                      <TableCell className="text-right font-black text-slate-900">{inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency}</TableCell>
                       <TableCell className="text-center">
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-red-50" onClick={() => handleDelete(inv.id)} disabled={actionInProgress}>
                           <Trash2 className="h-4 w-4" />
@@ -140,24 +149,54 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm h-fit">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" /> Zarządzanie kontami
-            </CardTitle>
-            <CardDescription>
-              Nowi użytkownicy mogą rejestrować się samodzielnie przez stronę logowania. 
-              Każde konto ma całkowicie odseparowaną bazę danych.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Aby nadać uprawnienia administratora nowemu użytkownikowi, należy dopisać jego e-mail do listy w kodzie aplikacji.
+        <div className="space-y-6">
+          <Card className="border-none shadow-sm bg-primary/5 border border-primary/10">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                <Globe className="h-5 w-5" /> Udostępnianie w sieci
+              </CardTitle>
+              <CardDescription>
+                Twoja aplikacja jest gotowa do publikacji.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600 space-y-4">
+              <div className="space-y-2">
+                <p className="font-bold text-slate-900">Jak udostępnić link?</p>
+                <ol className="list-decimal list-inside space-y-2">
+                  <li>Przejdź do konsoli <b>Firebase Console</b>.</li>
+                  <li>Wybierz swój projekt i sekcję <b>App Hosting</b>.</li>
+                  <li>Połącz repozytorium i uruchom wdrożenie.</li>
+                  <li>Otrzymasz publiczny link (np. <i>nazwa.web.app</i>).</li>
+                </ol>
+              </div>
+              <p className="text-xs italic bg-white p-3 rounded border">
+                Każdy użytkownik, który zarejestruje się pod publicznym linkiem, będzie widział wspólną listę faktur, ale tylko Ty będziesz miał dostęp do tego panelu.
               </p>
-            </div>
-          </CardContent>
-        </Card>
+              <Button variant="outline" className="w-full" asChild>
+                <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer">
+                  Otwórz Firebase Console <ExternalLink className="h-3 w-3 ml-2" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-green-600" /> Bezpieczeństwo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600 space-y-2">
+              <p>Aktualnie zalogowany jako: <b>{user?.email}</b></p>
+              <p>Rola: <span className="text-green-600 font-bold">SUPER ADMINISTRATOR</span></p>
+              <hr className="my-3" />
+              <p className="text-xs">
+                Współpracownicy po rejestracji otrzymują uprawnienia <b>Tylko do odczytu</b>. 
+                Nie mogą usuwać dokumentów ani importować nowych danych.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
