@@ -25,7 +25,8 @@ import {
   Rocket,
   CreditCard,
   ChevronRight,
-  Github
+  Github,
+  Info
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
@@ -165,33 +166,37 @@ export default function AdminPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-4">
-              <div className="space-y-2 p-4 bg-green-50 rounded-lg border border-green-200">
-                <p className="font-bold text-green-800 flex items-center gap-2 text-xs">
-                  <Github className="h-4 w-4" /> OSTATNI KROK: FINALIZACJA
+              
+              <div className="space-y-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="font-bold text-amber-800 flex items-center gap-2 text-xs">
+                  <Info className="h-4 w-4" /> PROBLEM Z PRZYCISKIEM SAVE?
                 </p>
-                <p className="text-green-700 text-[11px] leading-relaxed">
-                  Skoro kliknąłeś "Save" na GitHubie, wróć do zakładki <b>App Hosting</b> w konsoli. Wybierz repozytorium projektu i kliknij <b>"Finish and Deploy"</b>. 
+                <p className="text-amber-700 text-[11px] leading-relaxed">
+                  Jeśli przycisk <b>Save</b> na GitHubie jest szary/niedostępny:
+                  <br />- Wybierz opcję <b>"Only select repositories"</b> zamiast "All repositories".
+                  <br />- Z listy wybierz repozytorium o nazwie <b>studio-project</b>.
+                  <br />- Przycisk powinien się aktywować!
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <p className="font-bold text-slate-900">STATUS WDROŻENIA</p>
+              <div className="space-y-3 mt-4">
+                <p className="font-bold text-slate-900">KROKI DO WDROŻENIA:</p>
                 <ol className="space-y-3 text-[12px]">
                   <li className="flex gap-2">
                     <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">1</span>
-                    <span>Wybierz repozytorium z list (z nazwą <b>studio-project</b>).</span>
+                    <span>Po kliknięciu <b>Save</b> wróć do konsoli Firebase.</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">2</span>
-                    <span>Ustaw nazwę (np. <b>ksef-studio</b>) i gałąź <b>main</b>.</span>
+                    <span>Wybierz repozytorium <b>studio-project</b> z listy w Firebase.</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">3</span>
-                    <span>Kliknij <b>Deploy</b> i poczekaj ok. 5 minut na budowanie.</span>
+                    <span>Ustaw nazwę (np. <b>ksef-studio</b>) i gałąź <b>main</b>.</span>
                   </li>
-                  <li className="flex gap-2 text-primary font-bold">
-                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[10px]">URL</span>
-                    <span>Po zakończeniu otrzymasz link do udostępnienia!</span>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">4</span>
+                    <span>Kliknij <b>Deploy</b> i poczekaj ok. 5 minut.</span>
                   </li>
                 </ol>
               </div>
@@ -200,10 +205,10 @@ export default function AdminPage() {
                 <p className="text-xs font-bold text-primary mb-2 flex items-center gap-2">
                   <LayoutDashboard className="h-3 w-3" /> Masz trudności?
                 </p>
-                <p className="text-[11px] mb-3 text-slate-500">Jeśli po kliknięciu Save nie widzisz listy repozytoriów, odśwież stronę konsoli Firebase.</p>
+                <p className="text-[11px] mb-3 text-slate-500">Po wdrożeniu otrzymasz publiczny link, który będzie działał dla wszystkich.</p>
                 <Button variant="default" className="w-full bg-primary h-9" asChild>
                   <a href="https://console.firebase.google.com/project/studio-4075507772-6bfaa/apphosting" target="_blank" rel="noopener noreferrer">
-                    Dokończ w App Hosting <ExternalLink className="h-3 w-3 ml-2" />
+                    Wróć do Konsoli Firebase <ExternalLink className="h-3 w-3 ml-2" />
                   </a>
                 </Button>
               </div>
