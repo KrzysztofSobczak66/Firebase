@@ -1,6 +1,6 @@
 /**
  * @fileOverview Zaawansowany parser XML dla KSeF FA(3).
- * Wyciąga wszystkie dane: Podmiot 1, 2, 3, płatności, pełne adresy i zestawienia VAT.
+ * Wyciąga wszystkie dane: Podmiot 1, 2, 3, płatności, pełne adresy, kaucje i zestawienia VAT.
  */
 
 export interface InvoiceItem {
@@ -10,6 +10,7 @@ export interface InvoiceItem {
   netValue: number;
   vatRate: string;
   vatValue: number;
+  gtin?: string;
 }
 
 export interface PartyData {
@@ -18,11 +19,17 @@ export interface PartyData {
   addressL1: string;
   addressL2: string;
   countryCode: string;
-  gln: string;
+  gln?: string;
   role?: string;
 }
 
+export interface Charge {
+  amount: number;
+  reason: string;
+}
+
 export interface ParsedKSeF {
+  id: string;
   invoiceNumber: string;
   invoiceDate: string;
   saleDate: string;
@@ -39,6 +46,8 @@ export interface ParsedKSeF {
   amountToPay: number;
   items: InvoiceItem[];
   vats: { rate: string; net: number; vat: number }[];
+  charges: Charge[];
+  sumCharges: number;
   paymentMethod: string;
   paymentTermDescription: string;
   // Legacy fields for backward compatibility in UI
@@ -93,6 +102,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const wiersze = getEls("FaWiersz");
     const items: InvoiceItem[] = wiersze.map(w => ({
       description: getVal("P_7", w),
+      gtin: getVal("GTIN", w),
       quantity: parseFloat(getVal("P_8B", w).replace(",", ".")) || 0,
       unitPrice: parseFloat(getVal("P_9A", w).replace(",", ".")) || 0,
       netValue: parseFloat(getVal("P_11", w).replace(",", ".")) || 0,
@@ -108,9 +118,17 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       { rate: "zw", net: parseFloat(getVal("P_13_5").replace(",", ".")) || 0, vat: 0 }
     ].filter(v => v.net !== 0 || v.vat !== 0);
 
+    const obciazeniaEls = getEls("Obciazenia");
+    const charges: Charge[] = obciazeniaEls.map(o => ({
+      amount: parseFloat(getVal("Kwota", o).replace(",", ".")) || 0,
+      reason: getVal("Powod", o)
+    }));
+
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
+    const amountToPay = parseFloat(getVal("DoZaplaty").replace(",", ".")) || gross;
 
     return {
+      id: 'ksef-' + Date.now() + Math.random().toString(36).substr(2, 5),
       invoiceNumber: getVal("P_2"),
       invoiceDate: getVal("P_1"),
       saleDate: getVal("P_6") || getVal("P_1"),
@@ -124,11 +142,13 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       totalNet: vats.reduce((s, v) => s + v.net, 0) || (gross / 1.23),
       totalVat: vats.reduce((s, v) => s + v.vat, 0) || (gross - (gross / 1.23)),
       totalGross: gross,
-      amountToPay: parseFloat(getVal("DoZaplaty").replace(",", ".")) || gross,
+      amountToPay: amountToPay,
       items,
       vats,
+      charges,
+      sumCharges: parseFloat(getVal("SumaObciazen").replace(",", ".")) || 0,
       paymentMethod: getVal("FormaPlatnosci"),
-      paymentTermDescription: getVal("TerminOpis"),
+      paymentTermDescription: `${getVal("Ilosc")} ${getVal("Jednostka")}`,
       // Legacy mapping
       sellerName: seller.name,
       sellerNip: seller.nip,
