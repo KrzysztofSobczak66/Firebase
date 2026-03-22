@@ -1,7 +1,6 @@
 /**
- * @fileOverview Zaawansowany, kliencki parser XML dla KSeF FA(3).
- * Wyciąga pełne dane faktury, w tym wszystkie pozycje towarowe, dane adresowe, 
- * płatności i szczegółowe sumy podatkowe.
+ * @fileOverview Zaawansowany parser XML dla KSeF FA(3).
+ * Wyciąga wszystkie dane: Podmiot 1, 2, 3, płatności, pełne adresy i zestawienia VAT.
  */
 
 export interface InvoiceItem {
@@ -13,26 +12,42 @@ export interface InvoiceItem {
   vatValue: number;
 }
 
+export interface PartyData {
+  name: string;
+  nip: string;
+  addressL1: string;
+  addressL2: string;
+  countryCode: string;
+  gln: string;
+  role?: string;
+}
+
 export interface ParsedKSeF {
   invoiceNumber: string;
   invoiceDate: string;
   saleDate: string;
   dueDate: string;
+  currency: string;
+  seller: PartyData;
+  buyer: PartyData;
+  recipient?: PartyData;
+  bankAccount: string;
+  bankName: string;
+  totalNet: number;
+  totalVat: number;
+  totalGross: number;
+  amountToPay: number;
+  items: InvoiceItem[];
+  vats: { rate: string; net: number; vat: number }[];
+  paymentMethod: string;
+  paymentTermDescription: string;
+  // Legacy fields for backward compatibility in UI
   sellerName: string;
   sellerNip: string;
   sellerAddress: string;
   buyerName: string;
   buyerNip: string;
   buyerAddress: string;
-  bankAccount: string;
-  totalNet: number;
-  totalVat: number;
-  totalGross: number;
-  amountToPay: number;
-  currency: string;
-  items: InvoiceItem[];
-  // Dodatkowe pola techniczne
-  vats: { rate: string; net: number; vat: number }[];
 }
 
 export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
@@ -40,7 +55,6 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
-    // Pomocnicza funkcja ignorująca prefiksy (np. ns0:)
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
       const all = parent.getElementsByTagName("*");
       for (let i = 0; i < all.length; i++) {
@@ -58,32 +72,41 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       return res;
     };
 
-    const sellerEl = getEls("Podmiot1")[0];
-    const buyerEl = getEls("Podmiot2")[0];
-
-    const formatAddr = (el: Element) => {
-      if (!el) return "";
-      const l1 = getVal("AdresL1", el);
-      const l2 = getVal("AdresL2", el);
-      return [l1, l2].filter(Boolean).join(", ");
+    const parseParty = (tagName: string): PartyData | undefined => {
+      const el = getEls(tagName)[0];
+      if (!el) return undefined;
+      return {
+        name: getVal("Nazwa", el),
+        nip: getVal("NIP", el),
+        addressL1: getVal("AdresL1", el),
+        addressL2: getVal("AdresL2", el),
+        countryCode: getVal("KodKraju", el) || "PL",
+        gln: getVal("GLN", el),
+        role: getVal("Rola", el)
+      };
     };
+
+    const seller = parseParty("Podmiot1")!;
+    const buyer = parseParty("Podmiot2")!;
+    const recipient = parseParty("Podmiot3");
 
     const wiersze = getEls("FaWiersz");
     const items: InvoiceItem[] = wiersze.map(w => ({
-      description: getVal("P_7", w) || "Towar/Usługa",
+      description: getVal("P_7", w),
       quantity: parseFloat(getVal("P_8B", w).replace(",", ".")) || 0,
       unitPrice: parseFloat(getVal("P_9A", w).replace(",", ".")) || 0,
       netValue: parseFloat(getVal("P_11", w).replace(",", ".")) || 0,
       vatValue: parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0,
-      vatRate: getVal("P_12", w) ? getVal("P_12", w) + "%" : "23%"
+      vatRate: getVal("P_12", w)
     }));
 
-    // Sumy VAT
     const vats = [
       { rate: "23%", net: parseFloat(getVal("P_13_1").replace(",", ".")) || 0, vat: parseFloat(getVal("P_14_1").replace(",", ".")) || 0 },
       { rate: "8%", net: parseFloat(getVal("P_13_2").replace(",", ".")) || 0, vat: parseFloat(getVal("P_14_2").replace(",", ".")) || 0 },
-      { rate: "5%", net: parseFloat(getVal("P_13_3").replace(",", ".")) || 0, vat: parseFloat(getVal("P_14_3").replace(",", ".")) || 0 }
-    ].filter(v => v.net > 0 || v.vat > 0);
+      { rate: "5%", net: parseFloat(getVal("P_13_3").replace(",", ".")) || 0, vat: parseFloat(getVal("P_14_3").replace(",", ".")) || 0 },
+      { rate: "0%", net: parseFloat(getVal("P_13_4").replace(",", ".")) || 0, vat: 0 },
+      { rate: "zw", net: parseFloat(getVal("P_13_5").replace(",", ".")) || 0, vat: 0 }
+    ].filter(v => v.net !== 0 || v.vat !== 0);
 
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
 
@@ -92,23 +115,30 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       invoiceDate: getVal("P_1"),
       saleDate: getVal("P_6") || getVal("P_1"),
       dueDate: getVal("Termin"),
-      sellerName: sellerEl ? getVal("Nazwa", sellerEl) : "",
-      sellerNip: sellerEl ? getVal("NIP", sellerEl) : "",
-      sellerAddress: formatAddr(sellerEl),
-      buyerName: buyerEl ? getVal("Nazwa", buyerEl) : "",
-      buyerNip: buyerEl ? getVal("NIP", buyerEl) : "",
-      buyerAddress: formatAddr(buyerEl),
+      currency: getVal("KodWaluty") || "PLN",
+      seller,
+      buyer,
+      recipient,
       bankAccount: getVal("NrRB"),
-      totalNet: items.reduce((s, i) => s + i.netValue, 0) || (gross / 1.23),
-      totalVat: items.reduce((s, i) => s + i.vatValue, 0) || (gross - (gross / 1.23)),
+      bankName: getVal("NazwaBanku"),
+      totalNet: vats.reduce((s, v) => s + v.net, 0) || (gross / 1.23),
+      totalVat: vats.reduce((s, v) => s + v.vat, 0) || (gross - (gross / 1.23)),
       totalGross: gross,
       amountToPay: parseFloat(getVal("DoZaplaty").replace(",", ".")) || gross,
-      currency: getVal("KodWaluty") || "PLN",
       items,
-      vats
+      vats,
+      paymentMethod: getVal("FormaPlatnosci"),
+      paymentTermDescription: getVal("TerminOpis"),
+      // Legacy mapping
+      sellerName: seller.name,
+      sellerNip: seller.nip,
+      sellerAddress: `${seller.addressL1}, ${seller.addressL2}`,
+      buyerName: buyer.name,
+      buyerNip: buyer.nip,
+      buyerAddress: `${buyer.addressL1}, ${buyer.addressL2}`
     };
   } catch (e) {
-    console.error("XML Parse Error:", e);
+    console.error("Critical XML Parse Error:", e);
     return null;
   }
 }
