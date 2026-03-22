@@ -56,6 +56,7 @@ export default function AdminImportPage() {
       else if (file.name.toLowerCase().endsWith('.pdf')) {
         const dataUri = await fileToBase64(file)
         try {
+          // Próba analizy AI
           const extracted = await extractPdfInvoiceData({ pdfDataUri: dataUri })
           dataToSave = {
             invoiceNumber: extracted.invoiceNumber,
@@ -67,10 +68,10 @@ export default function AdminImportPage() {
             sourceFile: file.name
           }
         } catch (aiError: any) {
-          console.error("AI Extraction Error:", aiError)
-          // Jeśli AI zawiedzie, a jesteśmy w trybie demo, pozwalamy na mockowanie danych
-          const useMock = confirm(`Błąd AI dla ${file.name}: ${aiError.message}\n\nCzy chcesz zaimportować ten plik z danymi testowymi (Tryb Demo)?`)
-          if (useMock) {
+          console.error("Błąd AI dla pliku PDF:", aiError)
+          
+          // Jeśli AI nie działa, pytamy o tryb demo, aby nie blokować interfejsu
+          if (confirm(`Błąd analizy AI dla ${file.name}:\n${aiError.message}\n\nCzy chcesz dodać ten plik w trybie demo (dane testowe)?`)) {
             dataToSave = { ...generateMockPdfData(file.name), pdfDataUri: dataUri }
           } else {
             throw aiError
@@ -83,7 +84,7 @@ export default function AdminImportPage() {
         if (res.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
         else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
       } else {
-        throw new Error("Nie udało się rozpoznać formatu pliku.")
+        throw new Error("Nie rozpoznano formatu pliku.")
       }
     } catch (error: any) {
       console.error(`Błąd pliku ${file.name}:`, error)
@@ -91,7 +92,7 @@ export default function AdminImportPage() {
       toast({ 
         variant: "destructive", 
         title: `Błąd: ${file.name}`, 
-        description: error.message || "Wystąpił problem." 
+        description: error.message || "Wystąpił nieoczekiwany problem." 
       })
     }
   }
@@ -115,7 +116,7 @@ export default function AdminImportPage() {
     setCurrentFile("")
     toast({ 
       title: "Przetwarzanie zakończone", 
-      description: `Sukces: ${stats.added + stats.updated}, Błędy: ${stats.errors}`
+      description: `Pomyślnie: ${stats.added + stats.updated}, Błędy: ${stats.errors}`
     })
     event.target.value = ''
   }
@@ -128,8 +129,7 @@ export default function AdminImportPage() {
             <Info className="h-4 w-4 text-amber-600" />
             <AlertTitle className="text-amber-800 font-semibold">Tryb Lokalny / Demo</AlertTitle>
             <AlertDescription className="text-amber-700">
-              Przetwarzasz pliki bez połączenia z chmurą. Faktury zostaną zapisane w pamięci przeglądarki.
-              Dla plików PDF zalecany jest klucz <strong>GEMINI_API_KEY</strong> w .env.
+              Dane są zapisywane w pamięci przeglądarki. Skonfiguruj klucze w .env, aby użyć Firestore i Gemini AI.
             </AlertDescription>
           </Alert>
         )}
@@ -137,16 +137,16 @@ export default function AdminImportPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Alert className="bg-blue-50 border-blue-200">
             <ShieldCheck className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800 font-semibold">XML (KSeF)</AlertTitle>
+            <AlertTitle className="text-blue-800 font-semibold">XML (Bezpośredni)</AlertTitle>
             <AlertDescription className="text-blue-700 text-xs">
-              Natychmiastowe przetwarzanie bez AI.
+              Szybkie przetwarzanie bez użycia AI.
             </AlertDescription>
           </Alert>
           <Alert className="bg-purple-50 border-purple-200">
             <Sparkles className="h-4 w-4 text-purple-600" />
             <AlertTitle className="text-purple-800 font-semibold">PDF (Gemini AI)</AlertTitle>
             <AlertDescription className="text-purple-700 text-xs">
-              Analiza treści faktur PDF przez sztuczną inteligencję.
+              Wykorzystuje sztuczną inteligencję do odczytu danych.
             </AlertDescription>
           </Alert>
         </div>
@@ -156,8 +156,8 @@ export default function AdminImportPage() {
         <CardHeader className="bg-white border-b">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Import Dokumentów</CardTitle>
-              <CardDescription>Wybierz pliki XML lub PDF do przetworzenia.</CardDescription>
+              <CardTitle>Import Masowy</CardTitle>
+              <CardDescription>Przeciągnij pliki XML (KSeF) lub PDF (Faktury tradycyjne).</CardDescription>
             </div>
             {isUploading && <Loader2 className="h-5 w-5 text-primary animate-spin" />}
           </div>
@@ -176,8 +176,8 @@ export default function AdminImportPage() {
               <RefreshCw className={`h-8 w-8 text-primary ${isUploading ? 'animate-spin' : ''}`} />
             </div>
             <div className="text-center">
-              <p className="font-semibold text-lg text-slate-700">Wybierz lub przeciągnij pliki</p>
-              <p className="text-sm text-muted-foreground">Obsługujemy KSeF XML oraz PDF</p>
+              <p className="font-semibold text-lg text-slate-700">Kliknij lub upuść pliki tutaj</p>
+              <p className="text-sm text-muted-foreground">Obsługujemy .xml i .pdf</p>
             </div>
           </div>
 
@@ -186,7 +186,7 @@ export default function AdminImportPage() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm font-medium">
                   <span className="truncate max-w-[300px]">
-                    {isUploading ? `Przetwarzanie: ${currentFile}` : 'Gotowe'}
+                    {isUploading ? `Analizuję: ${currentFile}` : 'Wszystkie pliki przetworzone'}
                   </span>
                   <span>{progress}%</span>
                 </div>
@@ -194,15 +194,15 @@ export default function AdminImportPage() {
               </div>
               
               <div className="grid grid-cols-3 gap-4">
-                <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                  <p className="text-[10px] text-green-600 font-bold uppercase">Poprawne</p>
+                <div className="bg-green-50 p-4 rounded-lg border border-green-100 text-center">
+                  <p className="text-[10px] text-green-600 font-bold uppercase">Sukces</p>
                   <p className="text-2xl font-bold">{stats.added + stats.updated}</p>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <p className="text-[10px] text-slate-600 font-bold uppercase">Wszystkich</p>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">
+                  <p className="text-[10px] text-slate-600 font-bold uppercase">Z kolejki</p>
                   <p className="text-2xl font-bold">{stats.total}</p>
                 </div>
-                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                <div className="bg-red-50 p-4 rounded-lg border border-red-100 text-center">
                   <p className="text-[10px] text-red-600 font-bold uppercase">Błędy</p>
                   <p className="text-2xl font-bold">{stats.errors}</p>
                 </div>
