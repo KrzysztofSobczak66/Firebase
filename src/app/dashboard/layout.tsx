@@ -1,24 +1,22 @@
+
 "use client"
 
 import * as React from "react"
 import { 
-  LayoutDashboard, 
   FileText, 
   ShieldCheck, 
   Upload, 
   User, 
   LogOut, 
-  FilePlus,
-  Search,
   Settings,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Menu
 } from "lucide-react"
 
 import { 
   Sidebar, 
   SidebarContent, 
-  SidebarFooter, 
   SidebarHeader, 
   SidebarMenu, 
   SidebarMenuButton, 
@@ -42,6 +40,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, isUserLoading } = useUser()
   const auth = useAuth()
 
+  // Prosta logika roli: email admin@ksef.pl jest administratorem
+  const isAdmin = user?.email === 'admin@ksef.pl'
+
   React.useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login')
@@ -64,11 +65,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!user) return null
 
   const navItems = [
-    { label: "Panel główny", icon: LayoutDashboard, href: "/dashboard" },
-    { label: "Faktury", icon: FileText, href: "/dashboard/invoices" },
-    { label: "Weryfikacja AI", icon: ShieldCheck, href: "/dashboard/ai-validator" },
-    { label: "Masowy Import", icon: Upload, href: "/dashboard/admin/import" },
-    { label: "Administracja", icon: ShieldAlert, href: "/dashboard/admin" },
+    { label: "Lista Faktur", icon: FileText, href: "/dashboard/invoices", show: true },
+    { label: "Weryfikacja AI", icon: ShieldCheck, href: "/dashboard/ai-validator", show: true },
+    { label: "Masowy Import", icon: Upload, href: "/dashboard/admin/import", show: isAdmin },
+    { label: "Administracja", icon: ShieldAlert, href: "/dashboard/admin", show: isAdmin },
   ]
 
   const settingsItems = [
@@ -87,15 +87,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <span className="text-xl font-bold tracking-tight text-white">KSeF Studio</span>
             </div>
+            {isAdmin && (
+              <div className="mt-2 px-2">
+                <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
+                  Administrator
+                </span>
+              </div>
+            )}
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupLabel className="text-white/60 px-4 mb-2 uppercase text-[10px] font-bold tracking-widest">
-                Menu Główne
+                Dokumenty
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navItems.map((item) => (
+                  {navItems.filter(i => i.show).map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton 
                         asChild 
@@ -151,19 +158,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <SidebarTrigger className="md:hidden" />
             <div className="flex-1 flex items-center justify-between">
               <h1 className="text-2xl font-bold text-foreground font-headline">
-                {navItems.find(i => i.href === pathname)?.label || "Dashboard"}
+                {navItems.find(i => i.href === pathname)?.label || "KSeF Studio"}
               </h1>
               <div className="flex items-center gap-4">
-                <Button variant="outline" className="hidden sm:flex border-primary text-primary hover:bg-primary/5">
-                  <Search className="h-4 w-4 mr-2" />
-                  Szukaj...
-                </Button>
-                <Button asChild className="bg-accent hover:bg-accent/90 text-white font-semibold">
-                  <Link href="/dashboard/invoices/new">
-                    <FilePlus className="h-4 w-4 mr-2" />
-                    Nowa Faktura
-                  </Link>
-                </Button>
+                {isAdmin && (
+                  <Button asChild className="bg-primary hover:bg-primary/90 text-white font-semibold">
+                    <Link href="/dashboard/admin/import">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import XML
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
           </header>
