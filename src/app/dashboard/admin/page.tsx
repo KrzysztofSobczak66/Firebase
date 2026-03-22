@@ -31,9 +31,9 @@ export default function AdminPage() {
     setLoading(true)
     try {
       const data = await getAllInvoices()
-      setInvoices(data)
+      setInvoices(data || [])
     } catch (error) {
-      toast({ variant: "destructive", title: "Błąd", description: "Nie udało się pobrać danych z bazy." })
+      toast({ variant: "destructive", title: "Błąd", description: "Nie udało się pobrać danych." })
     } finally {
       setLoading(false)
     }
@@ -60,7 +60,7 @@ export default function AdminPage() {
   }
 
   const handleDelete = async (id: string) => {
-    console.log("Usuwanie faktury:", id);
+    console.log("Wywołano usuwanie dla ID:", id);
     if (!window.confirm("Czy na pewno chcesz usunąć tę fakturę?")) return
     
     setLoading(true)
@@ -69,7 +69,7 @@ export default function AdminPage() {
       setInvoices(prev => prev.filter(inv => inv.id !== id))
       toast({ title: "Usunięto", description: "Faktura została usunięta." })
     } catch (error: any) {
-      console.error("Błąd usuwania:", error);
+      console.error("Błąd podczas usuwania:", error);
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
     } finally {
       setLoading(false)
@@ -77,23 +77,23 @@ export default function AdminPage() {
   }
 
   const handleClearAll = async () => {
-    console.log("Rozpoczynanie czyszczenia bazy...");
-    if (!window.confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury?")) return
+    console.log("Wywołano czyszczenie całej bazy");
+    if (!window.confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy?")) return
     
     setClearing(true)
     try {
       await deleteAllInvoices()
       setInvoices([])
       toast({ 
-        title: "Sukces", 
-        description: "Baza danych została wyczyszczona." 
+        title: "Baza wyczyszczona", 
+        description: "Wszystkie dokumenty zostały usunięte pomyślnie." 
       })
     } catch (error: any) {
-      console.error("Błąd czyszczenia:", error);
+      console.error("Błąd czyszczenia bazy:", error);
       toast({ 
         variant: "destructive", 
         title: "Błąd", 
-        description: error.message || "Wystąpił błąd podczas czyszczenia." 
+        description: "Wystąpił problem podczas usuwania danych." 
       })
     } finally {
       setClearing(false)
@@ -169,7 +169,7 @@ export default function AdminPage() {
           <Button 
             variant="destructive" 
             className="bg-red-600 hover:bg-red-700" 
-            onClick={handleClearAll} 
+            onClick={() => handleClearAll()} 
             disabled={clearing || loading}
           >
             {clearing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
