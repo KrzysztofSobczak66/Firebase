@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -20,7 +21,8 @@ import {
   Globe,
   ExternalLink,
   ShieldCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  Rocket
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
@@ -156,28 +158,38 @@ export default function AdminPage() {
                 <Globe className="h-5 w-5" /> Udostępnianie w sieci
               </CardTitle>
               <CardDescription>
-                Twoja aplikacja jest gotowa do publikacji.
+                Twoja aplikacja jest gotowa. Postępuj zgodnie z krokami poniżej:
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-4">
+              <div className="space-y-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="font-bold text-amber-800 flex items-center gap-2">
+                  <Rocket className="h-4 w-4" /> Ważna informacja:
+                </p>
+                <p className="text-amber-700 text-xs">
+                  Widoczny u Ciebie status "Waiting for your first release" oznacza, że musisz dokończyć konfigurację <b>App Hosting</b> (nie zwykłego Hostingu).
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <p className="font-bold text-slate-900">Kroki do publikacji:</p>
-                <ol className="list-decimal list-inside space-y-2">
-                  <li>Otwórz <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">Konsolę Firebase <ExternalLink className="h-3 w-3" /></a>.</li>
-                  <li>Wybierz swój projekt i sekcję <b>Build &gt; App Hosting</b>.</li>
-                  <li>Kliknij "Get started" i połącz swoje repozytorium GitHub.</li>
-                  <li>Postępuj zgodnie z instrukcjami, aby utworzyć Backend.</li>
-                  <li>Po wdrożeniu otrzymasz publiczny adres URL (np. <i>nazwa.web.app</i>).</li>
+                <ol className="list-decimal list-inside space-y-3">
+                  <li>Otwórz <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary font-bold underline inline-flex items-center gap-1">Konsolę Firebase <ExternalLink className="h-3 w-3" /></a>.</li>
+                  <li>W menu po lewej wybierz <b>Build</b>, a następnie <b>App Hosting</b>.</li>
+                  <li>Kliknij <b>"Get started"</b> i połącz swoje repozytorium GitHub.</li>
+                  <li>Wybierz gałąź (zazwyczaj <b>main</b>) i kliknij "Deploy".</li>
+                  <li>Firebase rozpocznie proces budowania. Po kilku minutach status zmieni się na <b>"Active"</b> i otrzymasz działający link.</li>
                 </ol>
               </div>
+              
               <div className="p-4 bg-white rounded-lg border border-primary/20">
                 <p className="text-xs font-bold text-primary mb-2 flex items-center gap-2">
                   <LayoutDashboard className="h-3 w-3" /> Konsola Firebase
                 </p>
-                <p className="text-xs mb-3 text-slate-500">Zarządzaj bazą danych, użytkownikami i monitoringiem bezpośrednio w chmurze Google.</p>
+                <p className="text-xs mb-3 text-slate-500">Po wdrożeniu, adres Twojej aplikacji znajdziesz w zakładce App Hosting.</p>
                 <Button variant="default" className="w-full bg-primary" asChild>
                   <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">
-                    Otwórz Konsolę Teraz <ExternalLink className="h-3 w-3 ml-2" />
+                    Przejdź do Konsoli <ExternalLink className="h-3 w-3 ml-2" />
                   </a>
                 </Button>
               </div>
@@ -195,7 +207,7 @@ export default function AdminPage() {
               <p>Uprawnienia: <span className="text-green-600 font-bold">SUPER ADMINISTRATOR</span></p>
               <hr className="my-3" />
               <p className="text-xs italic">
-                Każdy nowy użytkownik, który zarejestruje się pod Twoim linkiem, otrzyma automatycznie uprawnienia <b>Tylko do odczytu</b>.
+                Każdy nowy użytkownik, który zarejestruje się przez link, otrzyma automatycznie uprawnienia <b>Tylko do odczytu</b>.
               </p>
             </CardContent>
           </Card>
