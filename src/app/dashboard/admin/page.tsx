@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -165,7 +164,7 @@ export default function AdminPage() {
                 <p className="font-bold text-slate-900">Kroki do publikacji:</p>
                 <ol className="list-decimal list-inside space-y-2">
                   <li>Otwórz <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">Konsolę Firebase <ExternalLink className="h-3 w-3" /></a>.</li>
-                  <li>Wybierz swój projekt i sekcję <b>Build > App Hosting</b>.</li>
+                  <li>Wybierz swój projekt i sekcję <b>Build &gt; App Hosting</b>.</li>
                   <li>Kliknij "Get started" i połącz swoje repozytorium GitHub.</li>
                   <li>Postępuj zgodnie z instrukcjami, aby utworzyć Backend.</li>
                   <li>Po wdrożeniu otrzymasz publiczny adres URL (np. <i>nazwa.web.app</i>).</li>
