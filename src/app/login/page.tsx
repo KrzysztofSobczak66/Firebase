@@ -1,8 +1,10 @@
+
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,12 +21,27 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   const auth = useAuth();
+  const db = useFirestore();
+
+  // Funkcja do tworzenia/aktualizacji profilu w Firestore
+  const syncUserProfile = async (uid: string, userEmail: string) => {
+    try {
+      await setDoc(doc(db, "userProfiles", uid), {
+        email: userEmail,
+        createdAt: new Date().toISOString(),
+        lastLogin: serverTimestamp(),
+      }, { merge: true });
+    } catch (e) {
+      console.error("Błąd synchronizacji profilu:", e);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await syncUserProfile(cred.user.uid, email);
       router.push('/dashboard');
       toast({ title: 'Witaj ponownie!', description: 'Zalogowano pomyślnie.' });
     } catch (error: any) {
@@ -42,7 +59,8 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await syncUserProfile(cred.user.uid, email);
       router.push('/dashboard');
       toast({ title: 'Konto utworzone', description: 'Witaj w systemie KSeF Studio.' });
     } catch (error: any) {
@@ -128,7 +146,7 @@ export default function LoginPage() {
 
         <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium uppercase tracking-widest">
           <ShieldCheck className="h-4 w-4" />
-          Bezpieczne połączenie z KSeF
+          Bezpieczne połączenie i izolacja danych
         </div>
       </div>
     </div>
