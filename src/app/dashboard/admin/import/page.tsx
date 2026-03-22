@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from "react"
@@ -60,6 +59,8 @@ export default function AdminImportPage() {
     } catch (error) {
       console.error(`Błąd pliku ${file.name}:`, error)
       setStats(prev => ({ ...prev, errors: prev.errors + 1 }))
+      // Dodatkowe opóźnienie przy błędzie (prawdopodobny rate limit)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 
@@ -72,33 +73,29 @@ export default function AdminImportPage() {
     setStats({ added: 0, updated: 0, total: files.length, errors: 0 })
 
     const fileList = Array.from(files)
-    // Sortujemy: najpierw XML (szybsze), potem PDF
+    // Najpierw XML (mniejsze obciążenie), potem PDF
     const sortedFiles = fileList.sort((a, b) => {
       if (a.name.endsWith('.xml') && !b.name.endsWith('.xml')) return -1
       if (!a.name.endsWith('.xml') && b.name.endsWith('.xml')) return 1
       return 0
     })
 
-    // Przetwarzanie w paczkach po 3 (optymalizacja pod rate limits)
-    const BATCH_SIZE = 3
-    for (let i = 0; i < sortedFiles.length; i += BATCH_SIZE) {
-      const batch = sortedFiles.slice(i, i + BATCH_SIZE)
-      await Promise.all(batch.map(file => processFile(file)))
+    // Zmniejszona paczka do 1 pliku naraz dla darmowych limitów Gemini
+    for (let i = 0; i < sortedFiles.length; i++) {
+      await processFile(sortedFiles[i])
       
-      const newProgress = Math.round(((i + batch.length) / sortedFiles.length) * 100)
+      const newProgress = Math.round(((i + 1) / sortedFiles.length) * 100)
       setProgress(newProgress)
       
-      // Mała przerwa między paczkami, by oszczędzić API Gemini
-      if (i + BATCH_SIZE < sortedFiles.length) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
+      // Obowiązkowa przerwa między zapytaniami do AI
+      await new Promise(resolve => setTimeout(resolve, 1500))
     }
 
     setIsUploading(false)
     setCurrentFile("")
     toast({ 
       title: "Synchronizacja zakończona", 
-      description: `Przetworzono wszystkie pliki. Błędy: ${stats.errors}` 
+      description: `Przetworzono ${sortedFiles.length} plików.` 
     })
     event.target.value = ''
   }
@@ -109,7 +106,7 @@ export default function AdminImportPage() {
         <CardHeader>
           <CardTitle>Masowy Import (XML & PDF)</CardTitle>
           <CardDescription>
-            System przetwarza teraz pliki w paczkach, aby uniknąć przeciążenia przy dużych wolumenach.<br/>
+            System przetwarza pliki sekwencyjnie, aby zachować stabilność przy dużych wolumenach.<br/>
             <code className="text-xs bg-slate-100 p-1 rounded mt-2 block font-mono">
               Lokalizacja: {LOCAL_PATH}
             </code>
@@ -171,6 +168,12 @@ export default function AdminImportPage() {
                   </div>
                 </div>
               </div>
+              
+              {stats.errors > 0 && (
+                <p className="text-xs text-muted-foreground bg-slate-50 p-2 rounded border border-dashed">
+                  Wskazówka: Jeśli widzisz dużo błędów, sprawdź czy klucz API Gemini ma wystarczające limity lub spróbuj mniejszej paczki plików.
+                </p>
+              )}
             </div>
           )}
         </CardContent>
