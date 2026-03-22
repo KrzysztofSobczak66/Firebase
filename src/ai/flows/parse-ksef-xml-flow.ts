@@ -5,6 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const KSeFParseInputSchema = z.object({
   xmlContent: z.string().describe('Raw XML content of the KSeF invoice.'),
@@ -33,6 +34,7 @@ export type KSeFParseOutput = z.infer<typeof KSeFParseOutputSchema>;
 
 const ksefParsePrompt = ai.definePrompt({
   name: 'ksefParsePrompt',
+  model: gemini15Flash,
   input: { schema: KSeFParseInputSchema },
   output: { schema: KSeFParseOutputSchema },
   prompt: `You are a specialist in Polish KSeF XML (FA(3) schema). 
@@ -48,7 +50,12 @@ const ksefParsePrompt = ai.definePrompt({
 });
 
 export async function parseKSeFXML(xmlContent: string): Promise<KSeFParseOutput> {
-  const { output } = await ksefParsePrompt({ xmlContent });
-  if (!output) throw new Error('Failed to parse XML content.');
-  return output;
+  try {
+    const { output } = await ksefParsePrompt({ xmlContent });
+    if (!output) throw new Error('AI returned empty output.');
+    return output;
+  } catch (error: any) {
+    console.error("AI Parse Error:", error);
+    throw error;
+  }
 }
