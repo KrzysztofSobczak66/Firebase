@@ -9,7 +9,6 @@ import {
   doc, 
   updateDoc, 
   getFirestore,
-  setDoc,
   limit
 } from "firebase/firestore";
 import { initializeApp, getApps } from "firebase/app";
@@ -27,44 +26,76 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 export const db = getFirestore(app);
 
 export async function findInvoiceByDetails(invoiceNumber: string, sellerNip: string) {
+  if (!invoiceNumber) return null;
+  
   const q = query(
     collection(db, "invoices"), 
     where("invoiceNumber", "==", invoiceNumber),
     where("sellerNip", "==", sellerNip),
     limit(1)
   );
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) return null;
-  return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+  
+  try {
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return null;
+    return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+  } catch (error) {
+    console.error("Błąd podczas wyszukiwania faktury:", error);
+    return null;
+  }
 }
 
 export async function saveInvoice(invoiceData: any) {
-  const existing = await findInvoiceByDetails(invoiceData.invoiceNumber, invoiceData.sellerNip || invoiceData.seller?.nip || "");
+  const invoiceNumber = invoiceData.invoiceNumber;
+  const sellerNip = invoiceData.sellerNip || invoiceData.seller?.nip || "";
+  
+  const existing = await findInvoiceByDetails(invoiceNumber, sellerNip);
   
   if (existing) {
-    // Jeśli rekord istnieje, a my dodajemy nowe dane (np. PDF), aktualizujemy go
     const docRef = doc(db, "invoices", existing.id);
-    await updateDoc(docRef, {
-      ...invoiceData,
+    const updateData: any = {
       updatedAt: new Date().toISOString()
-    });
+    };
+
+    // Aktualizujemy tylko puste pola, np. dodajemy PDF do istniejącego rekordu XML
+    if (invoiceData.pdfDataUri && !existing.pdfDataUri) {
+      updateData.pdfDataUri = invoiceData.pdfDataUri;
+    }
+    
+    // Jeśli przesyłamy pełne dane z XML, a mamy tylko PDF, aktualizujemy całość
+    if (invoiceData.items && !existing.items) {
+      Object.assign(updateData, invoiceData);
+    }
+
+    await updateDoc(docRef, updateData);
     return { status: 'updated', id: existing.id };
   }
 
-  const docRef = await addDoc(collection(db, "invoices"), {
-    ...invoiceData,
-    createdAt: new Date().toISOString(),
-    status: 'ACCEPTED'
-  });
-  return { status: 'added', id: docRef.id };
+  try {
+    const docRef = await addDoc(collection(db, "invoices"), {
+      ...invoiceData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'ACCEPTED'
+    });
+    return { status: 'added', id: docRef.id };
+  } catch (error) {
+    console.error("Błąd podczas dodawania faktury:", error);
+    throw error;
+  }
 }
 
 export async function getAllInvoices() {
-  const querySnapshot = await getDocs(collection(db, "invoices"));
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+  try {
+    const querySnapshot = await getDocs(collection(db, "invoices"));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error("Błąd pobierania wszystkich faktur:", error);
+    return [];
+  }
 }
 
 export async function deleteInvoice(id: string) {
@@ -73,5 +104,8 @@ export async function deleteInvoice(id: string) {
 
 export async function updateInvoice(id: string, data: any) {
   const docRef = doc(db, "invoices", id);
-  await updateDoc(docRef, data);
+  await updateDoc(docRef, {
+    ...data,
+    updatedAt: new Date().toISOString()
+  });
 }

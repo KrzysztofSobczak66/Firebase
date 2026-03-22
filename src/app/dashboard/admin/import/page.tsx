@@ -4,9 +4,9 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileCode, FileText, CheckCircle2, Loader2, RefreshCw, AlertCircle } from "lucide-react"
+import { FileText, CheckCircle2, RefreshCw } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
-import { toast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { parseKSeFXML } from "@/ai/flows/parse-ksef-xml-flow"
 import { extractPdfInvoiceData } from "@/ai/flows/pdf-invoice-data-extraction-flow"
 import { saveInvoice } from "@/lib/firestore"
@@ -15,6 +15,7 @@ export default function AdminImportPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [stats, setStats] = useState({ added: 0, updated: 0, total: 0 })
+  const { toast } = useToast()
 
   const LOCAL_PATH = "D:\\OneDrivePARTNER\\KSeF_DEV\\FV_Zakupowe\\DANE"
 
@@ -33,42 +34,55 @@ export default function AdminImportPage() {
 
     setIsUploading(true)
     setProgress(0)
-    setStats({ added: 0, updated: 0, total: files.length })
+    
+    let addedCount = 0
+    let updatedCount = 0
+    const totalFiles = files.length
+    
+    setStats({ added: 0, updated: 0, total: totalFiles })
 
-    for (let i = 0; i < files.length; i++) {
+    for (let i = 0; i < totalFiles; i++) {
       const file = files[i]
+      console.log(`Przetwarzanie pliku: ${file.name}`)
       
       try {
         if (file.name.toLowerCase().endsWith('.xml')) {
           const content = await file.text()
           const parsedData = await parseKSeFXML(content)
-          const result = await saveInvoice(parsedData)
+          const result = await saveInvoice({
+            ...parsedData,
+            sourceFile: file.name
+          })
           
           if (result.status === 'added') {
+            addedCount++
             setStats(prev => ({ ...prev, added: prev.added + 1 }))
           } else {
+            updatedCount++
             setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
           }
         } 
         else if (file.name.toLowerCase().endsWith('.pdf')) {
           const dataUri = await fileToBase64(file)
-          // AI ekstrahuje dane z PDF, aby wiedzieć, do której faktury go przypiąć
           const extractedData = await extractPdfInvoiceData({ pdfDataUri: dataUri })
           
           const result = await saveInvoice({
             ...extractedData,
             sellerNip: extractedData.seller.nip,
-            pdfDataUri: dataUri // Zapisujemy podgląd PDF w bazie
+            pdfDataUri: dataUri,
+            sourceFile: file.name
           })
 
           if (result.status === 'added') {
+            addedCount++
             setStats(prev => ({ ...prev, added: prev.added + 1 }))
           } else {
+            updatedCount++
             setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
           }
         }
         
-        setProgress(Math.round(((i + 1) / files.length) * 100))
+        setProgress(Math.round(((i + 1) / totalFiles) * 100))
       } catch (error) {
         console.error(`Błąd podczas przetwarzania ${file.name}:`, error)
         toast({ 
@@ -82,8 +96,11 @@ export default function AdminImportPage() {
     setIsUploading(false)
     toast({ 
       title: "Synchronizacja zakończona", 
-      description: `Nowe: ${stats.added}, Zaktualizowane: ${stats.updated}` 
+      description: `Pomyślnie przetworzono ${addedCount + updatedCount} plików z ${totalFiles}.` 
     })
+    
+    // Resetuj input
+    event.target.value = ''
   }
 
   return (
@@ -92,9 +109,9 @@ export default function AdminImportPage() {
         <CardHeader>
           <CardTitle>Masowy Import (XML & PDF)</CardTitle>
           <CardDescription>
-            System automatycznie parsuje XML oraz analizuje PDF przy użyciu AI. Dokumenty są łączone po numerze faktury.<br/>
+            Wybierz pliki z folderu lokalnego, aby zsynchronizować bazę danych. System automatycznie połączy dane XML z podglądem PDF.<br/>
             <code className="text-xs bg-slate-100 p-1 rounded mt-2 block font-mono">
-              Źródło: {LOCAL_PATH}
+              Lokalizacja: {LOCAL_PATH}
             </code>
           </CardDescription>
         </CardHeader>
@@ -112,28 +129,28 @@ export default function AdminImportPage() {
               <RefreshCw className={`h-8 w-8 text-primary ${isUploading ? 'animate-spin' : ''}`} />
             </div>
             <div className="text-center">
-              <p className="font-semibold text-lg">Synchronizuj folder DANE</p>
-              <p className="text-sm text-muted-foreground">Wybierz pliki XML (dane) i PDF (podgląd) jednocześnie.</p>
+              <p className="font-semibold text-lg">Zsynchronizuj pliki</p>
+              <p className="text-sm text-muted-foreground">Kliknij tutaj, zaznacz wszystkie pliki w folderze DANE i otwórz je.</p>
             </div>
           </div>
 
           {(isUploading || stats.total > 0) && (
-            <div className="mt-8 space-y-4">
+            <div className="mt-8 space-y-4 animate-in fade-in duration-500">
               <div className="flex justify-between text-sm font-medium">
-                <span>Postęp: {progress}%</span>
+                <span>{isUploading ? 'Przetwarzanie dokumentów...' : 'Przetwarzanie zakończone'}</span>
                 <span>{stats.added + stats.updated} / {stats.total}</span>
               </div>
               <Progress value={progress} className="h-2 bg-slate-100" />
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-green-50 p-4 rounded-lg flex items-center gap-3">
+                <div className="bg-green-50 p-4 rounded-lg flex items-center gap-3 border border-green-100">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                   <div>
-                    <p className="text-xs text-green-600 font-semibold uppercase">Nowe rekordy</p>
+                    <p className="text-xs text-green-600 font-semibold uppercase">Nowe w bazie</p>
                     <p className="text-xl font-bold">{stats.added}</p>
                   </div>
                 </div>
-                <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3">
+                <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3 border border-blue-100">
                   <FileText className="h-5 w-5 text-blue-500" />
                   <div>
                     <p className="text-xs text-blue-600 font-semibold uppercase">Zaktualizowane / PDF</p>
