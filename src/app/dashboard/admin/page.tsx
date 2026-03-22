@@ -23,7 +23,8 @@ import {
   ShieldCheck,
   LayoutDashboard,
   Rocket,
-  CreditCard
+  CreditCard,
+  ChevronRight
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
@@ -159,36 +160,47 @@ export default function AdminPage() {
                 <Globe className="h-5 w-5" /> Udostępnianie w sieci
               </CardTitle>
               <CardDescription>
-                Kroki do uruchomienia aplikacji Next.js:
+                Twoje kolejne kroki w konsoli:
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-4">
               <div className="space-y-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="font-bold text-amber-800 flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" /> Krok 1: Plan Blaze
+                <p className="font-bold text-amber-800 flex items-center gap-2 text-xs">
+                  <CreditCard className="h-4 w-4" /> KROK 1: PLAN BLAZE
                 </p>
-                <p className="text-amber-700 text-xs">
-                  App Hosting wymaga planu <b>Blaze (Pay-as-you-go)</b>. Kliknij "Upgrade project" w konsoli i podepnij kartę. Nie martw się – limity darmowe są bardzo wysokie.
+                <p className="text-amber-700 text-[11px] leading-relaxed">
+                  App Hosting wymaga planu <b>Blaze</b>. Kliknij <b>"Upgrade"</b> w lewym dolnym rogu konsoli. Podepnij kartę (opłaty naliczane tylko po przekroczeniu dużych limitów).
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <p className="font-bold text-slate-900">Krok 2: Konfiguracja App Hosting:</p>
-                <ol className="list-decimal list-inside space-y-3">
-                  <li>Otwórz <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary font-bold underline inline-flex items-center gap-1">Konsolę Firebase <ExternalLink className="h-3 w-3" /></a>.</li>
-                  <li>W menu <b>Build</b> wybierz <b>App Hosting</b> (nie zwykły Hosting).</li>
-                  <li>Kliknij <b>"Get started"</b> i połącz repozytorium GitHub.</li>
-                  <li>Wybierz gałąź <b>main</b> i kliknij "Deploy".</li>
-                  <li>Firebase zbuduje aplikację (ok. 5-10 min) i nada jej działający link.</li>
+              <div className="space-y-3">
+                <p className="font-bold text-slate-900">KROK 2: AKTYWACJA APP HOSTING</p>
+                <ol className="space-y-3 text-[12px]">
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">1</span>
+                    <span>W konsoli kliknij w projekt <b>Firebase app</b> (studio-4075507772-6bfaa).</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">2</span>
+                    <span>W menu po lewej wybierz <b>Build</b> &gt; <b>App Hosting</b>.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">3</span>
+                    <span>Kliknij <b>"Get started"</b> i połącz swoje konto <b>GitHub</b>.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 h-5 w-5 rounded-full bg-slate-200 flex items-center justify-center font-bold">4</span>
+                    <span>Wybierz repozytorium projektu i kliknij <b>"Finish and Deploy"</b>.</span>
+                  </li>
                 </ol>
               </div>
               
-              <div className="p-4 bg-white rounded-lg border border-primary/20">
+              <div className="p-4 bg-white rounded-lg border border-primary/20 mt-4">
                 <p className="text-xs font-bold text-primary mb-2 flex items-center gap-2">
                   <LayoutDashboard className="h-3 w-3" /> Gotowy do publikacji?
                 </p>
-                <p className="text-xs mb-3 text-slate-500">Po wdrożeniu otrzymasz link, który wyślesz użytkownikom.</p>
-                <Button variant="default" className="w-full bg-primary" asChild>
+                <p className="text-[11px] mb-3 text-slate-500">Gdy wdrożenie się zakończy, otrzymasz adres URL, który możesz wysłać użytkownikom.</p>
+                <Button variant="default" className="w-full bg-primary h-9" asChild>
                   <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">
                     Otwórz Konsolę Firebase <ExternalLink className="h-3 w-3 ml-2" />
                   </a>
@@ -207,8 +219,8 @@ export default function AdminPage() {
               <p>Zalogowany jako: <b>{user?.email}</b></p>
               <p>Uprawnienia: <span className="text-green-600 font-bold">SUPER ADMINISTRATOR</span></p>
               <hr className="my-3" />
-              <p className="text-xs italic">
-                Pamiętaj: Jako administrator masz jedyny dostęp do importu XML i usuwania danych. Inni użytkownicy będą widzieć tylko listę faktur.
+              <p className="text-xs italic text-slate-400">
+                Identyfikator Projektu: <code className="bg-slate-100 px-1 rounded">studio-4075507772-6bfaa</code>
               </p>
             </CardContent>
           </Card>
