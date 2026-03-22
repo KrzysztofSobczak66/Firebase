@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
@@ -31,7 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import html2canvas from "html2canvas"
-import jsPDF from "jspdf"
+import jsPDF from "jsPDF"
 
 const PAGE_SIZE = 50
 
@@ -48,6 +47,7 @@ export default function InvoicesPage() {
   const [endDate, setEndDate] = useState("")
   const [sellerFilter, setSellerFilter] = useState("")
   const [buyerFilter, setBuyerFilter] = useState("")
+  const [recipientFilter, setRecipientFilter] = useState("")
   const [minNet, setMinNet] = useState("")
   const [maxNet, setMaxNet] = useState("")
   
@@ -108,6 +108,10 @@ export default function InvoicesPage() {
         (inv.buyerName || "").toLowerCase().includes(buyerFilter.toLowerCase()) ||
         (inv.buyerNip || "").includes(buyerFilter)
 
+      const matchesRecipient = recipientFilter === "" || 
+        (inv.recipient?.name || "").toLowerCase().includes(recipientFilter.toLowerCase()) ||
+        (inv.recipient?.nip || "").includes(recipientFilter)
+
       const invDate = inv.invoiceDate || "";
       const matchesStartDate = startDate === "" || invDate >= startDate;
       const matchesEndDate = endDate === "" || invDate <= endDate;
@@ -116,9 +120,9 @@ export default function InvoicesPage() {
       const matchesMinNet = minNet === "" || invNet >= parseFloat(minNet);
       const matchesMaxNet = maxNet === "" || invNet <= parseFloat(maxNet);
 
-      return matchesSearch && matchesSeller && matchesBuyer && matchesStartDate && matchesEndDate && matchesMinNet && matchesMaxNet;
+      return matchesSearch && matchesSeller && matchesBuyer && matchesRecipient && matchesStartDate && matchesEndDate && matchesMinNet && matchesMaxNet;
     })
-  }, [searchQuery, sellerFilter, buyerFilter, startDate, endDate, minNet, maxNet, invoices])
+  }, [searchQuery, sellerFilter, buyerFilter, recipientFilter, startDate, endDate, minNet, maxNet, invoices])
 
   const sortedInvoices = useMemo(() => {
     const items = [...filteredInvoices]
@@ -160,6 +164,7 @@ export default function InvoicesPage() {
     setEndDate("")
     setSellerFilter("")
     setBuyerFilter("")
+    setRecipientFilter("")
     setMinNet("")
     setMaxNet("")
     setCurrentPage(1)
@@ -182,7 +187,7 @@ export default function InvoicesPage() {
             <Filter className="h-4 w-4" />
             Filtrowanie zaawansowane
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Numer Faktury</label>
               <Input 
@@ -211,6 +216,15 @@ export default function InvoicesPage() {
               />
             </div>
             <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Odbiorca / NIP</label>
+              <Input 
+                placeholder="NIP lub nazwa..." 
+                value={recipientFilter}
+                onChange={(e) => setRecipientFilter(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Data Od</label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9" />
             </div>
@@ -219,12 +233,12 @@ export default function InvoicesPage() {
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">Kwota Netto Od</label>
-              <Input type="number" placeholder="Min PLN" value={minNet} onChange={(e) => setMinNet(e.target.value)} className="h-9" />
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Netto Od</label>
+              <Input type="number" placeholder="Min" value={minNet} onChange={(e) => setMinNet(e.target.value)} className="h-9" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">Kwota Netto Do</label>
-              <Input type="number" placeholder="Max PLN" value={maxNet} onChange={(e) => setMaxNet(e.target.value)} className="h-9" />
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Netto Do</label>
+              <Input type="number" placeholder="Max" value={maxNet} onChange={(e) => setMaxNet(e.target.value)} className="h-9" />
             </div>
           </div>
           <div className="mt-4 flex justify-between items-center">
