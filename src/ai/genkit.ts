@@ -1,7 +1,6 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 
-// Inicjalizacja Genkit z obsługą klucza API z różnych źródeł środowiskowych
 export const ai = genkit({
   plugins: [
     googleAI({

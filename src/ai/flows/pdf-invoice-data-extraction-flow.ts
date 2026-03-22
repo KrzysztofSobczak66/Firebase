@@ -19,13 +19,6 @@ const CompanyDetailsSchema = z.object({
   address: AddressSchema.optional().describe('Company address.'),
 });
 
-const InvoiceItemSchema = z.object({
-  description: z.string().describe('Description of the item.'),
-  quantity: z.number().describe('Quantity.'),
-  unitPrice: z.number().describe('Price per unit.'),
-  vatRate: z.number().describe('VAT rate (e.g. 23).'),
-});
-
 const PdfInvoiceDataExtractionInputSchema = z.object({
   pdfDataUri: z.string().describe("PDF as data URI."),
 });
@@ -53,18 +46,7 @@ const pdfPrompt = ai.definePrompt({
 });
 
 export async function extractPdfInvoiceData(input: { pdfDataUri: string }): Promise<PdfInvoiceDataExtractionOutput> {
-  return pdfFlow(input);
+  const { output } = await pdfPrompt(input);
+  if (!output) throw new Error('Failed to extract data.');
+  return output;
 }
-
-const pdfFlow = ai.defineFlow(
-  {
-    name: 'pdfInvoiceDataExtractionFlow',
-    inputSchema: PdfInvoiceDataExtractionInputSchema,
-    outputSchema: PdfInvoiceDataExtractionOutputSchema,
-  },
-  async (input) => {
-    const { output } = await pdfPrompt(input);
-    if (!output) throw new Error('Failed to extract data.');
-    return output;
-  }
-);

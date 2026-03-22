@@ -35,6 +35,9 @@ const ksefParsePrompt = ai.definePrompt({
   name: 'ksefParsePrompt',
   input: { schema: KSeFParseInputSchema },
   output: { schema: KSeFParseOutputSchema },
+  config: {
+    model: 'googleai/gemini-1.5-flash',
+  },
   prompt: `You are a specialist in Polish KSeF XML (FA(3) schema). 
   Parse the following XML content and extract all required fields. 
   Pay close attention to namespaces (e.g., ns0:).
@@ -48,18 +51,7 @@ const ksefParsePrompt = ai.definePrompt({
 });
 
 export async function parseKSeFXML(xmlContent: string): Promise<KSeFParseOutput> {
-  return ksefParseFlow({ xmlContent });
+  const { output } = await ksefParsePrompt({ xmlContent });
+  if (!output) throw new Error('Failed to parse XML content.');
+  return output;
 }
-
-const ksefParseFlow = ai.defineFlow(
-  {
-    name: 'ksefParseFlow',
-    inputSchema: KSeFParseInputSchema,
-    outputSchema: KSeFParseOutputSchema,
-  },
-  async (input) => {
-    const { output } = await ksefParsePrompt(input);
-    if (!output) throw new Error('Failed to parse XML content.');
-    return output;
-  }
-);
