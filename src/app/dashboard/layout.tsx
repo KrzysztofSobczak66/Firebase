@@ -10,8 +10,7 @@ import {
   LogOut, 
   Settings,
   ShieldAlert,
-  Loader2,
-  Menu
+  Loader2
 } from "lucide-react"
 
 import { 
@@ -40,8 +39,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, isUserLoading } = useUser()
   const auth = useAuth()
 
-  // Prosta logika roli: email admin@ksef.pl jest administratorem
-  const isAdmin = user?.email === 'admin@ksef.pl'
+  // Lista administratorów
+  const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu']
+  const isAdmin = user && adminEmails.includes(user.email || '')
 
   React.useEffect(() => {
     if (!isUserLoading && !user) {

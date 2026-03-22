@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { 
   Search, 
   Download,
@@ -21,11 +22,13 @@ import {
   Filter,
   X,
   Printer,
-  Trash2
+  Trash2,
+  Edit2,
+  Save
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getAllInvoices, deleteInvoice } from "@/lib/firestore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { getAllInvoices, deleteInvoice, saveInvoice } from "@/lib/firestore"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { useUser } from "@/firebase"
@@ -39,11 +42,15 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [isExporting, setIsExporting] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isActionInProgress, setIsActionInProgress] = useState(false)
   const invoiceRef = useRef<HTMLDivElement>(null)
   const { user } = useUser()
   
-  const isAdmin = user?.email === 'admin@ksef.pl'
+  const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu']
+  const isAdmin = user && adminEmails.includes(user.email || '')
+  
+  // Edycja
+  const [editingInvoice, setEditingInvoice] = useState<any | null>(null)
   
   // Filtry
   const [searchQuery, setSearchQuery] = useState("")
@@ -79,7 +86,7 @@ export default function InvoicesPage() {
   const handleDeleteInvoice = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm("Czy na pewno chcesz usunąć tę fakturę?")) return
-    setIsDeleting(true)
+    setIsActionInProgress(true)
     try {
       await deleteInvoice(id)
       setInvoices(prev => prev.filter(inv => inv.id !== id))
@@ -87,7 +94,22 @@ export default function InvoicesPage() {
     } catch (err) {
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
     } finally {
-      setIsDeleting(false)
+      setIsActionInProgress(false)
+    }
+  }
+
+  const handleUpdateInvoice = async () => {
+    if (!editingInvoice) return
+    setIsActionInProgress(true)
+    try {
+      await saveInvoice(editingInvoice)
+      setInvoices(prev => prev.map(inv => inv.id === editingInvoice.id ? editingInvoice : inv))
+      toast({ title: "Zaktualizowano", description: "Zmiany zostały zapisane w bazie danych." })
+      setEditingInvoice(null)
+    } catch (err) {
+      toast({ variant: "destructive", title: "Błąd zapisu", description: "Nie udało się zaktualizować danych." })
+    } finally {
+      setIsActionInProgress(false)
     }
   }
 
@@ -259,7 +281,7 @@ export default function InvoicesPage() {
               <TableHead>Odbiorca / NIP</TableHead>
               <TableHead onClick={() => handleSort('totalNet')} className="text-right cursor-pointer group">Netto <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" /></TableHead>
               <TableHead onClick={() => handleSort('totalGross')} className="text-right cursor-pointer group">Brutto <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" /></TableHead>
-              <TableHead className="w-[120px] text-center">Opcje</TableHead>
+              <TableHead className="w-[140px] text-center">Akcje</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -269,9 +291,9 @@ export default function InvoicesPage() {
               <TableRow key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <TableCell className="font-bold text-primary">{inv.invoiceNumber}</TableCell>
                 <TableCell className="text-xs">{inv.invoiceDate}</TableCell>
-                <TableCell><div className="text-[10px] leading-tight"><p className="font-bold text-slate-700 truncate max-w-[150px]">{inv.sellerName}</p><p className="text-muted-foreground font-mono">{inv.sellerNip}</p></div></TableCell>
-                <TableCell><div className="text-[10px] leading-tight"><p className="font-bold text-slate-700 truncate max-w-[150px]">{inv.buyerName}</p><p className="text-muted-foreground font-mono">{inv.buyerNip}</p></div></TableCell>
-                <TableCell><div className="text-[10px] leading-tight"><p className="font-bold text-slate-700 truncate max-w-[150px]">{inv.recipient?.name || "-"}</p><p className="text-muted-foreground font-mono">{inv.recipient?.nip || ""}</p></div></TableCell>
+                <TableCell><div className="text-[10px] leading-tight"><p className="font-bold text-slate-700 truncate max-w-[120px]">{inv.sellerName}</p><p className="text-muted-foreground font-mono">{inv.sellerNip}</p></div></TableCell>
+                <TableCell><div className="text-[10px] leading-tight"><p className="font-bold text-slate-700 truncate max-w-[120px]">{inv.buyerName}</p><p className="text-muted-foreground font-mono">{inv.buyerNip}</p></div></TableCell>
+                <TableCell><div className="text-[10px] leading-tight"><p className="font-bold text-slate-700 truncate max-w-[120px]">{inv.recipient?.name || "-"}</p><p className="text-muted-foreground font-mono">{inv.recipient?.nip || ""}</p></div></TableCell>
                 <TableCell className="text-right font-bold text-slate-700">{inv.totalNet?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency}</TableCell>
                 <TableCell className="text-right font-black text-slate-900">{inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })} {inv.currency}</TableCell>
                 <TableCell className="text-center">
@@ -294,20 +316,82 @@ export default function InvoicesPage() {
                         </DialogHeader>
                         <div className="p-10 flex justify-center bg-slate-200/40">
                           <div id="printable-invoice" ref={invoiceRef} className="w-[210mm] bg-white p-16 shadow-2xl text-slate-800 font-sans border border-slate-300 relative">
-                            {/* PDF Content - Simplified for logic preservation */}
                             <div className="flex justify-between items-start border-b-8 border-primary pb-8 mb-10">
                               <div><h1 className="text-5xl font-black text-primary tracking-tighter mb-2 uppercase">FAKTURA VAT</h1></div>
                               <div className="text-right space-y-2"><p className="text-2xl font-black text-slate-700">Nr: {inv.invoiceNumber}</p><p className="text-xs">Data: {inv.invoiceDate}</p></div>
                             </div>
-                            {/* ... more PDF structure ... */}
+                            <div className="grid grid-cols-2 gap-12 mb-12">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase text-primary mb-3">Sprzedawca</p>
+                                    <p className="font-bold text-lg">{inv.sellerName}</p>
+                                    <p className="text-sm">{inv.seller?.addressL1}</p>
+                                    <p className="text-sm">{inv.seller?.addressL2}</p>
+                                    <p className="text-sm font-bold mt-1">NIP: {inv.sellerNip}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase text-primary mb-3">Nabywca</p>
+                                    <p className="font-bold text-lg">{inv.buyerName}</p>
+                                    <p className="text-sm">{inv.buyer?.addressL1}</p>
+                                    <p className="text-sm">{inv.buyer?.addressL2}</p>
+                                    <p className="text-sm font-bold mt-1">NIP: {inv.buyerNip}</p>
+                                </div>
+                            </div>
                           </div>
                         </div>
                       </DialogContent>
                     </Dialog>
+
                     {isAdmin && (
-                      <Button size="icon" variant="ghost" onClick={(e) => handleDeleteInvoice(inv.id, e)} className="h-8 w-8 text-destructive hover:bg-red-50">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-50" onClick={() => setEditingInvoice({...inv})}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Edytuj Fakturę</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-1">
+                                <Label>Numer Faktury</Label>
+                                <Input value={editingInvoice?.invoiceNumber || ""} onChange={e => setEditingInvoice({...editingInvoice, invoiceNumber: e.target.value})} />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label>Data Wystawienia</Label>
+                                  <Input type="date" value={editingInvoice?.invoiceDate || ""} onChange={e => setEditingInvoice({...editingInvoice, invoiceDate: e.target.value})} />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>Waluta</Label>
+                                  <Input value={editingInvoice?.currency || "PLN"} onChange={e => setEditingInvoice({...editingInvoice, currency: e.target.value})} />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label>Netto</Label>
+                                  <Input type="number" value={editingInvoice?.totalNet || 0} onChange={e => setEditingInvoice({...editingInvoice, totalNet: parseFloat(e.target.value)})} />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>Brutto</Label>
+                                  <Input type="number" value={editingInvoice?.totalGross || 0} onChange={e => setEditingInvoice({...editingInvoice, totalGross: parseFloat(e.target.value)})} />
+                                </div>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setEditingInvoice(null)}>Anuluj</Button>
+                              <Button onClick={handleUpdateInvoice} disabled={isActionInProgress}>
+                                {isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Zapisz
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+
+                        <Button size="icon" variant="ghost" onClick={(e) => handleDeleteInvoice(inv.id, e)} className="h-8 w-8 text-destructive hover:bg-red-50" disabled={isActionInProgress}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </TableCell>

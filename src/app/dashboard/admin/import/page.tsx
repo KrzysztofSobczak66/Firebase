@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { parseKSeFXMLClient } from "@/lib/ksef-xml-parser"
 import { saveInvoice } from "@/lib/firestore"
-import { RefreshCw, Loader2, AlertCircle } from "lucide-react"
+import { RefreshCw, Loader2 } from "lucide-react"
 import { useUser } from "@/firebase"
 import { useRouter } from "next/navigation"
 
@@ -20,7 +20,8 @@ export default function AdminImportPage() {
   const [stats, setStats] = useState({ added: 0, updated: 0, total: 0, errors: 0 })
   const { toast } = useToast()
 
-  const isAdmin = user?.email === 'admin@ksef.pl'
+  const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu']
+  const isAdmin = user && adminEmails.includes(user.email || '')
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin) {

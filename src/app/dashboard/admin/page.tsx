@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
-import { Trash2, ShieldAlert, Loader2, AlertTriangle, RefreshCw } from "lucide-react"
+import { Trash2, ShieldAlert, Loader2, AlertTriangle, RefreshCw, UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
 import { useUser } from "@/firebase"
@@ -26,7 +26,8 @@ export default function AdminPage() {
   const [actionInProgress, setActionInProgress] = useState(false)
   const { toast } = useToast()
 
-  const isAdmin = user?.email === 'admin@ksef.pl'
+  const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu']
+  const isAdmin = user && adminEmails.includes(user.email || '')
 
   const fetchInvoices = async () => {
     setLoading(true)
@@ -84,9 +85,9 @@ export default function AdminPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black flex items-center gap-3 text-slate-900">
-            <ShieldAlert className="h-8 w-8 text-destructive" /> Zarządzanie Bazą
+            <ShieldAlert className="h-8 w-8 text-destructive" /> Panel Administratora
           </h2>
-          <p className="text-slate-500">Panel administracyjny dostępny tylko dla konta admin@ksef.pl</p>
+          <p className="text-slate-500">Zarządzanie bazą danych i użytkownikami.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchInvoices} disabled={loading || actionInProgress}>
@@ -98,47 +99,66 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <Card className="border-none shadow-sm overflow-hidden bg-white">
-        <CardHeader className="bg-slate-50 border-b">
-          <CardTitle className="text-sm font-bold uppercase tracking-widest text-slate-500">
-            Twoje rekordy ({invoices.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow>
-                <TableHead>Numer Faktury</TableHead>
-                <TableHead>Sprzedawca</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead className="text-right">Kwota Brutto</TableHead>
-                <TableHead className="text-center w-[80px]">Akcje</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary opacity-20" /></TableCell></TableRow>
-              ) : invoices.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 italic">Baza jest pusta.</TableCell></TableRow>
-              ) : (
-                invoices.map((inv) => (
-                  <TableRow key={inv.id} className="hover:bg-slate-50/50">
-                    <TableCell className="font-bold text-slate-700">{inv.invoiceNumber}</TableCell>
-                    <TableCell><div className="max-w-[200px] truncate">{inv.sellerName}</div></TableCell>
-                    <TableCell className="text-slate-500 font-mono text-xs">{inv.invoiceDate}</TableCell>
-                    <TableCell className="text-right font-black text-slate-900">{inv.totalGross?.toLocaleString('pl-PL')} {inv.currency}</TableCell>
-                    <TableCell className="text-center">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-red-50" onClick={() => handleDelete(inv.id)} disabled={actionInProgress}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2 border-none shadow-sm overflow-hidden bg-white">
+          <CardHeader className="bg-slate-50 border-b">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest text-slate-500">
+              Twoje rekordy ({invoices.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow>
+                  <TableHead>Numer Faktury</TableHead>
+                  <TableHead>Sprzedawca</TableHead>
+                  <TableHead className="text-right">Brutto</TableHead>
+                  <TableHead className="text-center w-[80px]">Usuń</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-20"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary opacity-20" /></TableCell></TableRow>
+                ) : invoices.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-20 text-slate-400 italic">Baza jest pusta.</TableCell></TableRow>
+                ) : (
+                  invoices.map((inv) => (
+                    <TableRow key={inv.id} className="hover:bg-slate-50/50">
+                      <TableCell className="font-bold text-slate-700">{inv.invoiceNumber}</TableCell>
+                      <TableCell><div className="max-w-[150px] truncate">{inv.sellerName}</div></TableCell>
+                      <TableCell className="text-right font-black text-slate-900">{inv.totalGross?.toLocaleString('pl-PL')} {inv.currency}</TableCell>
+                      <TableCell className="text-center">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-red-50" onClick={() => handleDelete(inv.id)} disabled={actionInProgress}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm h-fit">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" /> Zarządzanie kontami
+            </CardTitle>
+            <CardDescription>
+              Nowi użytkownicy mogą rejestrować się samodzielnie przez stronę logowania. 
+              Każde konto ma całkowicie odseparowaną bazę danych.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Aby nadać uprawnienia administratora nowemu użytkownikowi, należy dopisać jego e-mail do listy w kodzie aplikacji.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
