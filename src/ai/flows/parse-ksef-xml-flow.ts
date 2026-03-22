@@ -20,7 +20,7 @@ const KSeFParseOutputSchema = z.object({
   totalNet: z.number().describe('Sum of net amounts (e.g., P_13_1 + P_13_3).'),
   totalVat: z.number().describe('Sum of VAT amounts (e.g., P_14_1 + P_14_3).'),
   totalGross: z.number().describe('P_15 field: Total gross amount.'),
-  currency: z.string().describe('KodWaluty field: Currency (e.g., PLN).'),
+  currency: z.string().default('PLN').describe('KodWaluty field: Currency (e.g., PLN).'),
   items: z.array(z.object({
     description: z.string().describe('P_7: Item description.'),
     quantity: z.number().describe('P_8B: Quantity.'),
@@ -33,6 +33,7 @@ export type KSeFParseOutput = z.infer<typeof KSeFParseOutputSchema>;
 
 const ksefParsePrompt = ai.definePrompt({
   name: 'ksefParsePrompt',
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: KSeFParseInputSchema },
   output: { schema: KSeFParseOutputSchema },
   prompt: `You are a specialist in Polish KSeF XML (FA(3) schema). 

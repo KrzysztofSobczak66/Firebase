@@ -37,14 +37,9 @@ const KSeFXMLValidationOutputSchema = z.object({
 });
 export type KSeFXMLValidationOutput = z.infer<typeof KSeFXMLValidationOutputSchema>;
 
-export async function ksefXMLValidation(
-  input: KSeFXMLValidationInput
-): Promise<KSeFXMLValidationOutput> {
-  return ksefXMLValidationFlow(input);
-}
-
 const ksefXMLValidationPrompt = ai.definePrompt({
   name: 'ksefXMLValidationPrompt',
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: KSeFXMLValidationInputSchema },
   output: { schema: KSeFXMLValidationOutputSchema },
   prompt: `You are an expert in Polish KSeF XML schema (FA(3)) validation. Your task is to analyze the provided XML content of a KSeF invoice.
@@ -62,14 +57,9 @@ XML Content:
 `,
 });
 
-const ksefXMLValidationFlow = ai.defineFlow(
-  {
-    name: 'ksefXMLValidationFlow',
-    inputSchema: KSeFXMLValidationInputSchema,
-    outputSchema: KSeFXMLValidationOutputSchema,
-  },
-  async (input) => {
-    const { output } = await ksefXMLValidationPrompt(input);
-    return output!;
-  }
-);
+export async function ksefXMLValidation(
+  input: KSeFXMLValidationInput
+): Promise<KSeFXMLValidationOutput> {
+  const { output } = await ksefXMLValidationPrompt(input);
+  return output!;
+}

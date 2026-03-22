@@ -37,6 +37,7 @@ export type PdfInvoiceDataExtractionOutput = z.infer<typeof PdfInvoiceDataExtrac
 
 const pdfPrompt = ai.definePrompt({
   name: 'pdfInvoiceDataExtractionPrompt',
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: PdfInvoiceDataExtractionInputSchema },
   output: { schema: PdfInvoiceDataExtractionOutputSchema },
   prompt: `Extract structured data from this PDF invoice: {{media url=pdfDataUri}}`,
