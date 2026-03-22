@@ -69,7 +69,13 @@ export default function InvoicesPage() {
     if (!invoiceRef.current) return;
     setIsExporting(true);
     try {
-      const canvas = await html2canvas(invoiceRef.current, { scale: 2 });
+      // Skalujemy canvas 2x dla lepszej jakości, wyłączamy skalowanie okna
+      const canvas = await html2canvas(invoiceRef.current, { 
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
