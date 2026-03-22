@@ -1,9 +1,10 @@
+
 "use client"
 
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2, Database, ShieldCheck, Info } from "lucide-react"
+import { FileText, CheckCircle2, RefreshCw, AlertCircle, Loader2, ShieldCheck, Info } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { parseKSeFXMLClient } from "@/lib/ksef-xml-parser"
@@ -45,13 +46,18 @@ export default function AdminImportPage() {
       } 
       else if (file.name.toLowerCase().endsWith('.pdf')) {
         const dataUri = await fileToBase64(file)
-        const extracted = await extractPdfInvoiceData({ pdfDataUri: dataUri })
-        dataToSave = {
-          ...extracted,
-          sellerName: extracted.seller?.name,
-          sellerNip: extracted.seller?.nip,
-          pdfDataUri: dataUri,
-          sourceFile: file.name
+        try {
+          const extracted = await extractPdfInvoiceData({ pdfDataUri: dataUri })
+          dataToSave = {
+            ...extracted,
+            sellerName: extracted.seller?.name,
+            sellerNip: extracted.seller?.nip,
+            pdfDataUri: dataUri,
+            sourceFile: file.name
+          }
+        } catch (aiError) {
+          console.error("AI Extraction Error:", aiError)
+          throw new Error("Błąd AI: Upewnij się, że masz skonfigurowany klucz GEMINI_API_KEY w .env")
         }
       }
 
@@ -60,11 +66,16 @@ export default function AdminImportPage() {
         if (res.status === 'added') setStats(prev => ({ ...prev, added: prev.added + 1 }))
         else setStats(prev => ({ ...prev, updated: prev.updated + 1 }))
       } else {
-        throw new Error("Nie udało się rozpoznać formatu pliku")
+        throw new Error("Nie udało się rozpoznać formatu pliku lub plik jest uszkodzony")
       }
     } catch (error: any) {
       console.error(`Błąd pliku ${file.name}:`, error)
       setStats(prev => ({ ...prev, errors: prev.errors + 1 }))
+      toast({ 
+        variant: "destructive", 
+        title: `Błąd: ${file.name}`, 
+        description: error.message || "Wystąpił nieoczekiwany problem." 
+      })
     }
   }
 
@@ -81,15 +92,14 @@ export default function AdminImportPage() {
     for (let i = 0; i < fileList.length; i++) {
       await processFile(fileList[i])
       setProgress(Math.round(((i + 1) / fileList.length) * 100))
-      // Krótkie opóźnienie dla UI
       await new Promise(r => setTimeout(r, 50))
     }
 
     setIsUploading(false)
     setCurrentFile("")
     toast({ 
-      title: "Import zakończony", 
-      description: isFirebaseConfigured ? "Dane zostały zapisane w chmurze." : "Dane zostały przetworzone w trybie symulacji."
+      title: "Przetwarzanie zakończone", 
+      description: `Sukces: ${stats.added + stats.updated}, Błędy: ${stats.errors}`
     })
     event.target.value = ''
   }
@@ -100,21 +110,30 @@ export default function AdminImportPage() {
         {!isFirebaseConfigured && (
           <Alert className="bg-amber-50 border-amber-200">
             <Info className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-800">Działasz w trybie lokalnym</AlertTitle>
+            <AlertTitle className="text-amber-800 font-semibold">Tryb Przeglądarkowy (Demo)</AlertTitle>
             <AlertDescription className="text-amber-700">
-              Możesz sprawdzić jak działa parser XML, ale dane nie zostaną zapisane w bazie Firestore. 
-              Aby połączyć bazę, wklej klucze SDK do pliku <strong>.env</strong>.
+              Przetwarzasz pliki lokalnie. Faktury zostaną zapisane w pamięci przeglądarki i zobaczysz je w zakładce "Faktury". 
+              Aby połączyć bazę na stałe, uzupełnij plik <strong>.env</strong>.
             </AlertDescription>
           </Alert>
         )}
 
-        <Alert className="bg-blue-50 border-blue-200">
-          <ShieldCheck className="h-4 w-4 text-blue-600" />
-          <AlertTitle className="text-blue-800 font-semibold">Błyskawiczny import XML aktywny</AlertTitle>
-          <AlertDescription className="text-blue-700">
-            Pliki XML są przetwarzane bezpośrednio w Twojej przeglądarce. Działa to natychmiastowo i bez użycia AI.
-          </AlertDescription>
-        </Alert>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Alert className="bg-blue-50 border-blue-200">
+            <ShieldCheck className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-800 font-semibold">Błyskawiczny XML</AlertTitle>
+            <AlertDescription className="text-blue-700 text-xs">
+              Pliki XML (KSeF) są przetwarzane natychmiastowo bez użycia AI.
+            </AlertDescription>
+          </Alert>
+          <Alert className="bg-purple-50 border-purple-200">
+            <FileText className="h-4 w-4 text-purple-600" />
+            <AlertTitle className="text-purple-800 font-semibold">Analiza PDF (AI)</AlertTitle>
+            <AlertDescription className="text-purple-700 text-xs">
+              Pliki PDF są analizowane przez Gemini AI. Wymaga klucza API w .env.
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
 
       <Card className="border-none shadow-sm overflow-hidden">
@@ -122,9 +141,9 @@ export default function AdminImportPage() {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle>Masowy Import Dokumentów</CardTitle>
-              <CardDescription>Wybierz pliki XML (KSeF) lub PDF z dysku.</CardDescription>
+              <CardDescription>Przeciągnij pliki XML (KSeF) lub PDF.</CardDescription>
             </div>
-            {!isFirebaseConfigured && <Badge variant="secondary" className="bg-amber-100 text-amber-800">Demo Mode</Badge>}
+            {!isFirebaseConfigured && <Badge variant="secondary" className="bg-amber-100 text-amber-800">Local DB Only</Badge>}
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -141,8 +160,8 @@ export default function AdminImportPage() {
               {isUploading ? <Loader2 className="h-8 w-8 text-primary animate-spin" /> : <RefreshCw className="h-8 w-8 text-primary" />}
             </div>
             <div className="text-center">
-              <p className="font-semibold text-lg text-slate-700">Kliknij lub przeciągnij pliki tutaj</p>
-              <p className="text-sm text-muted-foreground">Obsługiwane formaty: XML (KSeF), PDF</p>
+              <p className="font-semibold text-lg text-slate-700">Kliknij lub przeciągnij pliki</p>
+              <p className="text-sm text-muted-foreground">Obsługujemy KSeF XML oraz skany PDF</p>
             </div>
           </div>
 

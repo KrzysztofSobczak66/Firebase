@@ -18,11 +18,14 @@ import {
   ArrowUpDown,
   Download,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  FileCode,
+  Eye
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { getAllInvoices } from "@/lib/firestore"
+import { Badge } from "@/components/ui/badge"
 
 const PAGE_SIZE = 50
 
@@ -130,10 +133,11 @@ export default function InvoicesPage() {
               <TableHead onClick={() => handleSort('sellerName')} className="cursor-pointer">
                 <div className="flex items-center gap-2">Sprzedawca <ArrowUpDown className="h-3 w-3" /></div>
               </TableHead>
+              <TableHead>Źródło</TableHead>
               <TableHead onClick={() => handleSort('totalGross')} className="text-right cursor-pointer">
                 <div className="flex items-center justify-end gap-2">Brutto <ArrowUpDown className="h-3 w-3" /></div>
               </TableHead>
-              <TableHead className="w-[100px] text-center">Podgląd</TableHead>
+              <TableHead className="w-[100px] text-center">Akcje</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -142,48 +146,59 @@ export default function InvoicesPage() {
                 <TableCell className="font-medium text-primary">{inv.invoiceNumber}</TableCell>
                 <TableCell>{inv.invoiceDate}</TableCell>
                 <TableCell>{inv.sellerName || inv.seller?.name}</TableCell>
+                <TableCell>
+                  {inv.pdfDataUri ? (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      <FileText className="h-3 w-3 mr-1" /> PDF AI
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      <FileCode className="h-3 w-3 mr-1" /> KSeF XML
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right font-semibold">
-                  {inv.totalGross?.toLocaleString()} {inv.currency}
+                  {inv.totalGross?.toLocaleString()} {inv.currency || 'PLN'}
                 </TableCell>
                 <TableCell className="text-center">
-                  {inv.pdfDataUri ? (
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10">
-                          <FileText className="h-5 w-5" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-5xl h-[90vh] p-0 overflow-hidden bg-slate-100">
-                        <DialogHeader className="p-4 bg-white border-b">
-                          <DialogTitle className="flex justify-between items-center pr-8">
-                            <span>Podgląd: {inv.invoiceNumber}</span>
-                            <Button variant="outline" size="sm" asChild>
+                  <div className="flex justify-center gap-2">
+                    {inv.pdfDataUri ? (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10">
+                            <Eye className="h-5 w-5" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-5xl h-[90vh] p-0 overflow-hidden bg-slate-100 border-none shadow-2xl">
+                          <DialogHeader className="p-4 bg-white border-b flex flex-row items-center justify-between">
+                            <DialogTitle>Podgląd dokumentu: {inv.invoiceNumber}</DialogTitle>
+                            <Button variant="outline" size="sm" asChild className="mr-8">
                               <a href={inv.pdfDataUri} download={`Faktura_${inv.invoiceNumber}.pdf`}>
                                 <Download className="h-4 w-4 mr-2" /> Pobierz PDF
                               </a>
                             </Button>
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="w-full h-full p-4">
-                          <iframe 
-                            src={inv.pdfDataUri} 
-                            className="w-full h-[calc(100%-2rem)] rounded border shadow-lg bg-white"
-                            title="Invoice Preview"
-                          />
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  ) : (
-                    <div className="flex justify-center text-slate-300" title="Brak pliku PDF">
-                      <AlertCircle className="h-4 w-4" />
-                    </div>
-                  )}
+                          </DialogHeader>
+                          <div className="w-full h-full p-6">
+                            <iframe 
+                              src={inv.pdfDataUri} 
+                              className="w-full h-[calc(100%-2rem)] rounded-xl border shadow-xl bg-white"
+                              title="Invoice Preview"
+                            />
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <div className="p-2 text-slate-300" title="Dokument XML - brak podglądu PDF">
+                        <FileCode className="h-5 w-5 opacity-40" />
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
             {paginatedInvoices.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                   Brak dokumentów pasujących do kryteriów.
                 </TableCell>
               </TableRow>
