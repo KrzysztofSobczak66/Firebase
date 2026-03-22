@@ -8,11 +8,12 @@ import {
   deleteDoc, 
   doc, 
   updateDoc, 
-  getFirestore 
+  getFirestore,
+  setDoc,
+  limit
 } from "firebase/firestore";
 import { initializeApp, getApps } from "firebase/app";
 
-// Konfiguracja Firebase (używa zmiennych środowiskowych)
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -25,24 +26,35 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app);
 
-export async function checkInvoiceExists(invoiceNumber: string, sellerNip: string) {
+export async function findInvoiceByDetails(invoiceNumber: string, sellerNip: string) {
   const q = query(
     collection(db, "invoices"), 
     where("invoiceNumber", "==", invoiceNumber),
-    where("sellerNip", "==", sellerNip)
+    where("sellerNip", "==", sellerNip),
+    limit(1)
   );
   const querySnapshot = await getDocs(q);
-  return !querySnapshot.empty;
+  if (querySnapshot.empty) return null;
+  return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
 }
 
 export async function saveInvoice(invoiceData: any) {
-  const exists = await checkInvoiceExists(invoiceData.invoiceNumber, invoiceData.sellerNip);
-  if (exists) return { status: 'skipped' };
+  const existing = await findInvoiceByDetails(invoiceData.invoiceNumber, invoiceData.sellerNip || invoiceData.seller?.nip || "");
+  
+  if (existing) {
+    // Jeśli rekord istnieje, a my dodajemy nowe dane (np. PDF), aktualizujemy go
+    const docRef = doc(db, "invoices", existing.id);
+    await updateDoc(docRef, {
+      ...invoiceData,
+      updatedAt: new Date().toISOString()
+    });
+    return { status: 'updated', id: existing.id };
+  }
 
   const docRef = await addDoc(collection(db, "invoices"), {
     ...invoiceData,
     createdAt: new Date().toISOString(),
-    status: 'ACCEPTED' // Domyślny status dla faktur z KSeF
+    status: 'ACCEPTED'
   });
   return { status: 'added', id: docRef.id };
 }
