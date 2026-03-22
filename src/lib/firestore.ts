@@ -57,8 +57,9 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
 
 /**
  * Zapisuje fakturę w globalnej kolekcji. Dostępne tylko dla administratorów.
+ * Jeśli faktura istnieje, aktualizuje ją.
  */
-export async function saveInvoice(invoiceData: any) {
+export async function saveInvoice(invoiceData: any): Promise<{ status: 'added' | 'updated', id: string }> {
   const db = getDb();
   const { firebaseApp } = initializeFirebase();
   
