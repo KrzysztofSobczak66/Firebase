@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
@@ -73,22 +74,52 @@ export default function InvoicesPage() {
   const handleDownloadPDF = async (invoiceNumber: string) => {
     if (!invoiceRef.current) return;
     setIsExporting(true);
+    
     try {
+      // Skonfiguruj canvas dla pełnej wysokości, ignorując scroll
       const canvas = await html2canvas(invoiceRef.current, { 
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 1200
+        // Wymuś szerokość A4 (ok 800px przy standardowym DPI)
+        width: invoiceRef.current.offsetWidth,
+        height: invoiceRef.current.offsetHeight,
+        onclone: (clonedDoc) => {
+          // Upewnij się, że element jest widoczny podczas klonowania
+          const el = clonedDoc.getElementById('printable-invoice');
+          if (el) el.style.display = 'block';
+        }
       });
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
+      
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Dodaj pierwszą stronę
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      // Dodaj kolejne strony jeśli treść się nie mieści
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
       pdf.save(`Faktura_${invoiceNumber.replace(/\//g, '_')}.pdf`);
       toast({ title: "Sukces", description: "Dokument PDF został wygenerowany." });
     } catch (err) {
+      console.error("PDF Export Error:", err);
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się wygenerować PDF." });
     } finally {
       setIsExporting(false);
@@ -331,7 +362,7 @@ export default function InvoicesPage() {
                       </DialogHeader>
                       
                       <div className="p-10 flex justify-center bg-slate-200/40">
-                        <div ref={invoiceRef} className="w-[210mm] min-h-[297mm] bg-white p-16 shadow-2xl text-slate-800 font-sans border border-slate-300 relative">
+                        <div id="printable-invoice" ref={invoiceRef} className="w-[210mm] bg-white p-16 shadow-2xl text-slate-800 font-sans border border-slate-300 relative">
                           
                           {/* Header Sekcja 1 */}
                           <div className="flex justify-between items-start border-b-8 border-primary pb-8 mb-10">
