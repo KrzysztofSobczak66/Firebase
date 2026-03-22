@@ -1,7 +1,7 @@
 /**
  * @fileOverview Zaawansowany, kliencki parser XML dla KSeF FA(3).
  * Wyciąga pełne dane faktury, w tym wszystkie pozycje towarowe i dane adresowe.
- * Obsługuje przestrzenie nazw (namespaces) w sposób elastyczny, ignorując prefiksy.
+ * Obsługuje przestrzenie nazw (namespaces) w sposób elastyczny.
  */
 
 export interface InvoiceItem {
@@ -35,7 +35,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
-    // Pomocnicza funkcja do pobierania wartości taga bez względu na prefiks (ns0:, itp.)
+    // Pomocnicza funkcja do pobierania wartości taga ignorując prefiks ns0:
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
       const allElements = parent.getElementsByTagName("*");
       for (let i = 0; i < allElements.length; i++) {
@@ -58,28 +58,16 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       return result;
     };
 
-    // Pomocnicza funkcja do pobierania taga z konkretnego rodzica
-    const getValFrom = (tagName: string, parent: Element) => {
-      const children = parent.getElementsByTagName("*");
-      for (let i = 0; i < children.length; i++) {
-        if (children[i].localName === tagName) {
-          return children[i].textContent?.trim() || "";
-        }
-      }
-      return "";
-    };
-
-    // Szukamy sekcji podmiotów
+    // Wyciąganie sekcji podmiotów
     const sellerEls = getEls("Podmiot1");
     const buyerEls = getEls("Podmiot2");
     const sellerEl = sellerEls[0];
     const buyerEl = buyerEls[0];
 
-    // Wyciąganie adresu z Podmiotu
     const getAddressFromPodmiot = (podmiotEl: Element) => {
       if (!podmiotEl) return "";
-      const l1 = getValFrom("AdresL1", podmiotEl);
-      const l2 = getValFrom("AdresL2", podmiotEl);
+      const l1 = getVal("AdresL1", podmiotEl);
+      const l2 = getVal("AdresL2", podmiotEl);
       return l1 && l2 ? `${l1}, ${l2}` : (l1 || l2 || "");
     };
 
@@ -87,18 +75,18 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const wierszeEls = getEls("FaWiersz");
     
     const items: InvoiceItem[] = wierszeEls.map(w => {
-      const qStr = getValFrom("P_8B", w).replace(",", ".");
-      const pStr = getValFrom("P_9A", w).replace(",", ".");
-      const nStr = getValFrom("P_11", w).replace(",", ".");
-      const vStr = getValFrom("P_11Vat", w).replace(",", ".");
+      const qStr = getVal("P_8B", w).replace(",", ".");
+      const pStr = getVal("P_9A", w).replace(",", ".");
+      const nStr = getVal("P_11", w).replace(",", ".");
+      const vStr = getVal("P_11Vat", w).replace(",", ".");
       
       return {
-        description: getValFrom("P_7", w) || "Towar/Usługa",
+        description: getVal("P_7", w) || "Towar/Usługa",
         quantity: parseFloat(qStr) || 0,
         unitPrice: parseFloat(pStr) || 0,
         netValue: parseFloat(nStr) || 0,
         vatValue: parseFloat(vStr) || 0,
-        vatRate: getValFrom("P_12", w) ? getValFrom("P_12", w) + "%" : "23%"
+        vatRate: getVal("P_12", w) ? getVal("P_12", w) + "%" : "23%"
       };
     });
 
@@ -109,11 +97,11 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       invoiceNumber: getVal("P_2"),
       invoiceDate: getVal("P_1"),
       saleDate: getVal("P_6") || getVal("P_1"),
-      sellerName: sellerEl ? getValFrom("Nazwa", sellerEl) : getVal("Nazwa"),
-      sellerNip: sellerEl ? getValFrom("NIP", sellerEl) : getVal("NIP"),
+      sellerName: sellerEl ? getVal("Nazwa", sellerEl) : getVal("Nazwa"),
+      sellerNip: sellerEl ? getVal("NIP", sellerEl) : getVal("NIP"),
       sellerAddress: sellerEl ? getAddressFromPodmiot(sellerEl) : "",
-      buyerName: buyerEl ? getValFrom("Nazwa", buyerEl) : "",
-      buyerNip: buyerEl ? getValFrom("NIP", buyerEl) : "",
+      buyerName: buyerEl ? getVal("Nazwa", buyerEl) : "",
+      buyerNip: buyerEl ? getVal("NIP", buyerEl) : "",
       buyerAddress: buyerEl ? getAddressFromPodmiot(buyerEl) : "",
       totalNet: items.length > 0 ? items.reduce((sum, item) => sum + item.netValue, 0) : (parseFloat(getVal("P_13_1").replace(",", ".")) || gross / 1.23),
       totalVat: items.length > 0 ? items.reduce((sum, item) => sum + item.vatValue, 0) : (parseFloat(getVal("P_14_1").replace(",", ".")) || gross - (gross / 1.23)),
@@ -124,7 +112,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
 
     return data;
   } catch (error) {
-    console.error("Krytyczny błąd podczas parsowania KSeF XML:", error);
+    console.error("Błąd podczas parsowania XML:", error);
     return null;
   }
 }
