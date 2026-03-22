@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -82,6 +81,7 @@ export default function AdminUsersPage() {
   }
 
   const handleCopyLink = () => {
+    // Generujemy link do strony logowania na aktualnej domenie
     const url = window.location.origin + "/login"
     navigator.clipboard.writeText(url)
     setCopied(true)
