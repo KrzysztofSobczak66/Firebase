@@ -24,11 +24,11 @@ function getCurrentUserId() {
   return auth.currentUser?.uid;
 }
 
-// Ścieżka do kolekcji faktur użytkownika
+// Ścieżka do kolekcji faktur użytkownika - poprawiona na 3 segmenty (kolekcja/dokument/kolekcja)
 function getUserInvoicesPath() {
   const uid = getCurrentUserId();
   if (!uid) return null;
-  return `users/${uid}/companyProfile/invoices`;
+  return `users/${uid}/invoices`;
 }
 
 function getLocalInvoices() {
@@ -99,8 +99,7 @@ export async function saveInvoice(invoiceData: any) {
     const uid = getCurrentUserId();
     const dataWithUser = {
       ...invoiceData,
-      userId: uid,
-      companyProfileId: 'companyProfile' // Uproszczenie dla MVP
+      userId: uid
     };
 
     if (existing && !existing.id.startsWith('local-')) {

@@ -2,138 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * CORE PHILOSOPHY:
-     * This ruleset implements a strict hierarchical ownership model. All application data is 
-     * partitioned by User ID (UID) at the root level. Access is granted only to the authenticated 
-     * user whose UID matches the path segment.
-     *
-     * DATA STRUCTURE:
-     * - /users/{userId}: The root container for all user-specific business data.
-     * - /users/{userId}/companyProfile: The central profile for the user's business entity.
-     * - /users/{userId}/companyProfile/invoices: Sub-collection for financial records.
-     * - /users/{userId}/companyProfile/customerVendors: Sub-collection for business contacts.
-     *
-     * KEY SECURITY DECISIONS:
-     * 1. Authorization Independence: Every document contains denormalized ownership fields 
-     *    (e.g., userId, companyProfileId) to allow for fast, non-recursive security checks 
-     *    without using costly get() calls.
-     * 2. Path-Based Security: Rules primarily rely on the {userId} wildcard in the path 
-     *    matching the request.auth.uid.
-     * 3. Prototyping Flexibility: Data types and general schemas are not enforced to allow 
-     *    for rapid iteration, but relational links (IDs) are strictly validated during writes.
-     * 4. State Verification: Update and Delete operations strictly require the existence of 
-     *    the document (resource != null).
-     */
-
     // --- HELPER FUNCTIONS ---
-
-    /** @description Checks if the user is authenticated with any provider. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** @description Checks if the authenticated user's UID matches a provided ID (usually from path). */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** @description Checks ownership and ensures the document exists for state-changing operations. */
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
+    // --- RULES ---
+
+    // Publiczne profile użytkowników (do zarządzania przez administratora)
+    match /userProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
     }
 
-    /** @description Validates that a field in the incoming data matches the user's UID. */
-    function isValidOwnerField(fieldName) {
-      return request.resource.data[fieldName] == request.auth.uid;
+    // Faktury użytkowników - uproszczona i poprawna ścieżka
+    match /users/{userId}/invoices/{invoiceId} {
+      allow read, write: if isOwner(userId);
     }
-
-    /** @description Ensures a field's value does not change during an update. */
-    function isImmutable(fieldName) {
-      return request.resource.data[fieldName] == resource.data[fieldName];
-    }
-
-    // --- COLLECTION RULES ---
-
-    /**
-     * @description Rules for the primary Company Profile.
-     * @path /users/{userId}/companyProfile
-     * @allow (get) If auth.uid == "user123" and path is /users/user123/companyProfile.
-     * @deny (create) If request.resource.data.userId != "user123".
-     * @principle Ownership: Enforces that a user can only manage their own company profile.
-     */
-    match /users/{userId}/companyProfile {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField('userId');
-      allow update: if isExistingOwner(userId) && isImmutable('userId');
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Rules for Customer and Vendor contacts.
-     * @path /users/{userId}/companyProfile/customerVendors/{cvId}
-     * @allow (list) If auth.uid == "user123" on path /users/user123/companyProfile/customerVendors.
-     * @deny (update) If user tries to change the companyProfileId.
-     * @principle Relational Integrity: Ensures contacts stay linked to the correct user/company.
-     */
-    match /users/{userId}/companyProfile/customerVendors/{cvId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField('userId');
-      allow update: if isExistingOwner(userId) && isImmutable('userId') && isImmutable('companyProfileId');
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Rules for Invoices (Sales, Purchase, Correction).
-     * @path /users/{userId}/companyProfile/invoices/{invoiceId}
-     * @allow (create) If auth.uid == "user123" and data contains userId: "user123".
-     * @deny (delete) If the document does not exist or user is not the owner.
-     * @principle Ownership: Only the company owner can access or modify invoice data.
-     */
-    match /users/{userId}/companyProfile/invoices/{invoiceId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField('userId');
-      allow update: if isExistingOwner(userId) && isImmutable('userId') && isImmutable('companyProfileId');
-      allow delete: if isExistingOwner(userId);
-
-      /**
-       * @description Rules for individual line items within an invoice.
-       * @path /users/{userId}/companyProfile/invoices/{invoiceId}/invoiceItems/{itemId}
-       * @allow (create) If invoiceId in data matches invoiceId in path.
-       * @principle Path Consistency: Validates that items are created under the correct parent invoice.
-       */
-      match /invoiceItems/{itemId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.invoiceId == invoiceId;
-        allow update: if isExistingOwner(userId) && isImmutable('invoiceId');
-        allow delete: if isExistingOwner(userId);
-      }
-
-      /**
-       * @description Logs for KSeF submission attempts.
-       * @path /users/{userId}/companyProfile/invoices/{invoiceId}/ksefSubmissionLogs/{logId}
-       * @allow (get) If user owns the parent invoice path.
-       * @principle Auditability: Users can view logs for their own invoice submissions.
-       */
-      match /ksefSubmissionLogs/{logId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.invoiceId == invoiceId;
-        allow update: if isExistingOwner(userId) && isImmutable('invoiceId');
-        allow delete: if isExistingOwner(userId);
-      }
-    }
-
-    /**
-     * @description Metadata for files (XML, PDF) stored in Firebase Storage.
-     * @path /users/{userId}/companyProfile/documentFiles/{fileId}
-     * @allow (create) If uploadedByUserId matches the creator's UID.
-     * @principle Ownership: Tracks which user generated or uploaded a specific file record.
-     */
-    match /users/{userId}/companyProfile/documentFiles/{fileId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidOwnerField('uploadedByUserId');
-      allow update: if isExistingOwner(userId) && isImmutable('uploadedByUserId');
-      allow delete: if isExistingOwner(userId);
+    
+    // Fallback dla pozostałych ścieżek
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
