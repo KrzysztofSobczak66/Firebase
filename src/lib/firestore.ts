@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   addDoc, 
@@ -22,16 +21,17 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Inicjalizacja Firebase z obsługą braku konfiguracji
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app);
 
-export async function findInvoiceByDetails(invoiceNumber: string, sellerNip: string) {
+export async function findInvoiceByDetails(invoiceNumber: string) {
   if (!invoiceNumber) return null;
   
+  // Uproszczone zapytanie tylko po numerze faktury, aby uniknąć problemów z indeksami
   const q = query(
     collection(db, "invoices"), 
     where("invoiceNumber", "==", invoiceNumber),
-    where("sellerNip", "==", sellerNip),
     limit(1)
   );
   
@@ -46,32 +46,32 @@ export async function findInvoiceByDetails(invoiceNumber: string, sellerNip: str
 }
 
 export async function saveInvoice(invoiceData: any) {
-  const invoiceNumber = invoiceData.invoiceNumber;
-  const sellerNip = invoiceData.sellerNip || invoiceData.seller?.nip || "";
-  
-  const existing = await findInvoiceByDetails(invoiceNumber, sellerNip);
-  
-  if (existing) {
-    const docRef = doc(db, "invoices", existing.id);
-    const updateData: any = {
-      updatedAt: new Date().toISOString()
-    };
-
-    // Aktualizujemy tylko puste pola, np. dodajemy PDF do istniejącego rekordu XML
-    if (invoiceData.pdfDataUri && !existing.pdfDataUri) {
-      updateData.pdfDataUri = invoiceData.pdfDataUri;
-    }
-    
-    // Jeśli przesyłamy pełne dane z XML, a mamy tylko PDF, aktualizujemy całość
-    if (invoiceData.items && !existing.items) {
-      Object.assign(updateData, invoiceData);
-    }
-
-    await updateDoc(docRef, updateData);
-    return { status: 'updated', id: existing.id };
-  }
-
   try {
+    const invoiceNumber = invoiceData.invoiceNumber;
+    if (!invoiceNumber) {
+      throw new Error("Brak numeru faktury w danych wejściowych.");
+    }
+
+    const existing = await findInvoiceByDetails(invoiceNumber);
+    
+    if (existing) {
+      const docRef = doc(db, "invoices", existing.id);
+      const updateData: any = {
+        updatedAt: new Date().toISOString()
+      };
+
+      if (invoiceData.pdfDataUri && !(existing as any).pdfDataUri) {
+        updateData.pdfDataUri = invoiceData.pdfDataUri;
+      }
+      
+      if (invoiceData.items && !(existing as any).items) {
+        Object.assign(updateData, invoiceData);
+      }
+
+      await updateDoc(docRef, updateData);
+      return { status: 'updated', id: existing.id };
+    }
+
     const docRef = await addDoc(collection(db, "invoices"), {
       ...invoiceData,
       createdAt: new Date().toISOString(),
@@ -80,7 +80,7 @@ export async function saveInvoice(invoiceData: any) {
     });
     return { status: 'added', id: docRef.id };
   } catch (error) {
-    console.error("Błąd podczas dodawania faktury:", error);
+    console.error("Szczegółowy błąd zapisu faktury:", error);
     throw error;
   }
 }

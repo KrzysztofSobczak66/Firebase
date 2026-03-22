@@ -34,6 +34,11 @@ export default function AdminImportPage() {
       if (file.name.toLowerCase().endsWith('.xml')) {
         const content = await file.text()
         const parsedData = await parseKSeFXML(content)
+        
+        if (!parsedData || !parsedData.invoiceNumber) {
+          throw new Error("AI nie mogło sparsować numeru faktury z pliku XML.")
+        }
+
         const result = await saveInvoice({
           ...parsedData,
           sourceFile: file.name
@@ -46,6 +51,10 @@ export default function AdminImportPage() {
         const dataUri = await fileToBase64(file)
         const extractedData = await extractPdfInvoiceData({ pdfDataUri: dataUri })
         
+        if (!extractedData || !extractedData.invoiceNumber) {
+          throw new Error("AI nie mogło wyodrębnić danych z pliku PDF.")
+        }
+
         const result = await saveInvoice({
           ...extractedData,
           sellerNip: extractedData.seller?.nip,
@@ -59,8 +68,8 @@ export default function AdminImportPage() {
     } catch (error) {
       console.error(`Błąd pliku ${file.name}:`, error)
       setStats(prev => ({ ...prev, errors: prev.errors + 1 }))
-      // Dodatkowe opóźnienie przy błędzie (prawdopodobny rate limit)
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Przerwa na oddech dla API przy błędzie
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
   }
 
@@ -73,29 +82,26 @@ export default function AdminImportPage() {
     setStats({ added: 0, updated: 0, total: files.length, errors: 0 })
 
     const fileList = Array.from(files)
-    // Najpierw XML (mniejsze obciążenie), potem PDF
     const sortedFiles = fileList.sort((a, b) => {
       if (a.name.endsWith('.xml') && !b.name.endsWith('.xml')) return -1
-      if (!a.name.endsWith('.xml') && b.name.endsWith('.xml')) return 1
       return 0
     })
 
-    // Zmniejszona paczka do 1 pliku naraz dla darmowych limitów Gemini
     for (let i = 0; i < sortedFiles.length; i++) {
       await processFile(sortedFiles[i])
       
       const newProgress = Math.round(((i + 1) / sortedFiles.length) * 100)
       setProgress(newProgress)
       
-      // Obowiązkowa przerwa między zapytaniami do AI
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Wydłużone opóźnienie dla darmowego klucza Gemini
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
 
     setIsUploading(false)
     setCurrentFile("")
     toast({ 
       title: "Synchronizacja zakończona", 
-      description: `Przetworzono ${sortedFiles.length} plików.` 
+      description: `Zakończono przetwarzanie plików. Sprawdź wyniki w tabeli.` 
     })
     event.target.value = ''
   }
@@ -106,7 +112,7 @@ export default function AdminImportPage() {
         <CardHeader>
           <CardTitle>Masowy Import (XML & PDF)</CardTitle>
           <CardDescription>
-            System przetwarza pliki sekwencyjnie, aby zachować stabilność przy dużych wolumenach.<br/>
+            System przetwarza pliki sekwencyjnie. Jeśli napotkasz błędy, sprawdź konsolę przeglądarki (F12).<br/>
             <code className="text-xs bg-slate-100 p-1 rounded mt-2 block font-mono">
               Lokalizacja: {LOCAL_PATH}
             </code>
@@ -156,24 +162,18 @@ export default function AdminImportPage() {
                 <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3 border border-blue-100">
                   <FileText className="h-5 w-5 text-blue-500" />
                   <div>
-                    <p className="text-[10px] text-blue-600 font-semibold uppercase">Zaktualizowane / PDF</p>
+                    <p className="text-[10px] text-blue-600 font-semibold uppercase">Zaktualizowane</p>
                     <p className="text-xl font-bold">{stats.updated}</p>
                   </div>
                 </div>
                 <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3 border border-red-100">
                   <AlertCircle className="h-5 w-5 text-red-500" />
                   <div>
-                    <p className="text-[10px] text-red-600 font-semibold uppercase">Błędy / Limity</p>
+                    <p className="text-[10px] text-red-600 font-semibold uppercase">Błędy</p>
                     <p className="text-xl font-bold">{stats.errors}</p>
                   </div>
                 </div>
               </div>
-              
-              {stats.errors > 0 && (
-                <p className="text-xs text-muted-foreground bg-slate-50 p-2 rounded border border-dashed">
-                  Wskazówka: Jeśli widzisz dużo błędów, sprawdź czy klucz API Gemini ma wystarczające limity lub spróbuj mniejszej paczki plików.
-                </p>
-              )}
             </div>
           )}
         </CardContent>
