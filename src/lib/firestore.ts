@@ -8,7 +8,8 @@ import {
   doc, 
   updateDoc, 
   getFirestore,
-  limit
+  limit,
+  writeBatch
 } from "firebase/firestore";
 import { initializeApp, getApps, getApp } from "firebase/app";
 
@@ -21,7 +22,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Klucz do lokalnej bazy danych (fallback gdy brak Firebase)
 const LOCAL_STORAGE_KEY = 'ksef_invoices_local_db';
 
 export const isFirebaseConfigured = !!firebaseConfig.apiKey && 
@@ -42,7 +42,6 @@ function getFirebaseApp() {
 const app = getFirebaseApp();
 export const db = getFirestore(app);
 
-// Funkcje pomocnicze dla LocalStorage
 function getLocalInvoices() {
   if (typeof window === 'undefined') return [];
   const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -66,7 +65,6 @@ function saveToLocal(invoice: any) {
 export async function findInvoiceByDetails(invoiceNumber: string) {
   if (!invoiceNumber) return null;
   
-  // Najpierw sprawdź lokalnie
   const local = getLocalInvoices();
   const foundLocal = local.find((inv: any) => inv.invoiceNumber === invoiceNumber);
   if (foundLocal) return foundLocal;
@@ -89,11 +87,9 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
 }
 
 export async function saveInvoice(invoiceData: any) {
-  // Zapisz lokalnie zawsze, aby użytkownik widział zmiany natychmiast
   saveToLocal(invoiceData);
 
   if (!isFirebaseConfigured) {
-    console.log("Zapisano lokalnie (brak kluczy API):", invoiceData.invoiceNumber);
     return { status: 'added', id: 'local-id' };
   }
 
@@ -136,7 +132,6 @@ export async function getAllInvoices() {
       ...doc.data()
     }));
     
-    // Połącz dane (lokalne mają priorytet jeśli nowsze, ale Firestore to źródło prawdy)
     return [...firestoreInvoices, ...localInvoices.filter((l: any) => 
       !firestoreInvoices.some(f => f.invoiceNumber === l.invoiceNumber)
     )];
@@ -156,6 +151,26 @@ export async function deleteInvoice(id: string) {
 
   if (!isFirebaseConfigured) return;
   await deleteDoc(doc(db, "invoices", id));
+}
+
+export async function deleteAllInvoices() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+  }
+
+  if (!isFirebaseConfigured) return;
+
+  try {
+    const querySnapshot = await getDocs(collection(db, "invoices"));
+    const batch = writeBatch(db);
+    querySnapshot.docs.forEach((d) => {
+      batch.delete(doc(db, "invoices", d.id));
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Błąd podczas czyszczenia bazy danych:", error);
+    throw error;
+  }
 }
 
 export async function updateInvoice(id: string, data: any) {

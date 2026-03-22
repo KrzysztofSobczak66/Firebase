@@ -1,7 +1,7 @@
 /**
  * @fileOverview Zaawansowany, kliencki parser XML dla KSeF FA(3).
  * Wyciąga pełne dane faktury, w tym wszystkie pozycje towarowe i dane adresowe.
- * Zoptymalizowany pod kątem obsługi przestrzeni nazw (namespaces).
+ * Obsługuje przestrzenie nazw (namespaces) w sposób elastyczny.
  */
 
 export interface InvoiceItem {
@@ -35,13 +35,11 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
-    // Pomocnik do pobierania wartości tagu ignorując prefixy (ns0: itp)
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
       const el = parent.getElementsByTagNameNS("*", tagName)[0] || parent.getElementsByTagName(tagName)[0];
       return el ? el.textContent?.trim() || "" : "";
     };
 
-    // Pomocnik do pobierania wszystkich elementów o danej nazwie
     const getEls = (tagName: string, parent: Element | Document = xmlDoc) => {
       const els = parent.getElementsByTagNameNS("*", tagName);
       if (els.length > 0) return Array.from(els);
@@ -57,29 +55,26 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       return `${l1}, ${l2}`;
     };
 
-    // Podmioty
     const podmiot1 = xmlDoc.getElementsByTagNameNS("*", "Podmiot1")[0] || xmlDoc.getElementsByTagName("Podmiot1")[0];
     const podmiot2 = xmlDoc.getElementsByTagNameNS("*", "Podmiot2")[0] || xmlDoc.getElementsByTagName("Podmiot2")[0];
 
-    // Parsowanie pozycji faktury (FaWiersz)
-    const wierszeEls = getEls("FaWiersz");
+    // Pobieranie sekcji Fa dla precyzyjniejszego wyszukiwania wierszy
+    const faSection = xmlDoc.getElementsByTagNameNS("*", "Fa")[0] || xmlDoc.getElementsByTagName("Fa")[0];
+    
+    // Kluczowe: wyszukiwanie FaWiersz w całym dokumencie lub sekcji Fa
+    const wierszeEls = getEls("FaWiersz", faSection || xmlDoc);
+    
     const items: InvoiceItem[] = wierszeEls.map(w => {
-      const qty = parseFloat(getVal("P_8B", w).replace(",", ".")) || 0;
-      const price = parseFloat(getVal("P_9A", w).replace(",", ".")) || 0;
-      const net = parseFloat(getVal("P_11", w).replace(",", ".")) || 0;
-      const vatV = parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0;
-      
       return {
         description: getVal("P_7", w),
-        quantity: qty,
-        unitPrice: price,
-        netValue: net,
-        vatValue: vatV,
-        vatRate: getVal("P_12", w) + "%"
+        quantity: parseFloat(getVal("P_8B", w).replace(",", ".")) || 0,
+        unitPrice: parseFloat(getVal("P_9A", w).replace(",", ".")) || 0,
+        netValue: parseFloat(getVal("P_11", w).replace(",", ".")) || 0,
+        vatValue: parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0,
+        vatRate: getVal("P_12", w) ? getVal("P_12", w) + "%" : "23%"
       };
     });
 
-    // Sumowanie kwot (obsługa wielu stawek VAT) - poprawiona kolejność operacji
     const p13_1 = parseFloat(getVal("P_13_1").replace(",", ".")) || 0;
     const p13_2 = parseFloat(getVal("P_13_2").replace(",", ".")) || 0;
     const p13_3 = parseFloat(getVal("P_13_3").replace(",", ".")) || 0;

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -14,15 +13,16 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
-import { Lock, Trash2, Edit, Save, X, ShieldAlert, Loader2 } from "lucide-react"
+import { Lock, Trash2, Edit, Save, X, ShieldAlert, Loader2, AlertTriangle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { getAllInvoices, deleteInvoice, updateInvoice } from "@/lib/firestore"
+import { getAllInvoices, deleteInvoice, updateInvoice, deleteAllInvoices } from "@/lib/firestore"
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [clearing, setClearing] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<any>({})
 
@@ -67,6 +67,21 @@ export default function AdminPage() {
       toast({ title: "Usunięto", description: "Faktura została usunięta z bazy." })
     } catch (error) {
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
+    }
+  }
+
+  const handleClearAll = async () => {
+    if (!confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy (Firestore i LocalStorage)? Te operacji nie da się cofnąć.")) return
+    
+    setClearing(true)
+    try {
+      await deleteAllInvoices()
+      setInvoices([])
+      toast({ title: "Baza wyczyszczona", description: "Wszystkie rekordy zostały usunięte." })
+    } catch (error) {
+      toast({ variant: "destructive", title: "Błąd", description: "Wystąpił błąd podczas czyszczenia bazy." })
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -123,26 +138,30 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2 text-foreground font-headline">
             <ShieldAlert className="h-6 w-6 text-destructive" />
-            Zarządzanie Fakturami
+            Zarządzanie Bazą Danych
           </h2>
-          <p className="text-muted-foreground">Tryb edycji i usuwania rekordów z bazy Firestore.</p>
+          <p className="text-muted-foreground">Usuwanie i edycja faktur z bazy Firestore oraz pamięci lokalnej.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchInvoices} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Odśwież bazę"}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Odśwież"}
           </Button>
-          <Button variant="destructive" onClick={() => setIsAuthenticated(false)}>Wyloguj</Button>
+          <Button variant="destructive" className="bg-red-600 hover:bg-red-700" onClick={handleClearAll} disabled={clearing || invoices.length === 0}>
+            {clearing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
+            Wyczyść całą bazę
+          </Button>
+          <Button variant="secondary" onClick={() => setIsAuthenticated(false)}>Wyloguj</Button>
         </div>
       </div>
 
       <Card className="border-none shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Wszystkie dokumenty w kolekcji</CardTitle>
-          <CardDescription>Zmiany wprowadzone tutaj są natychmiastowe w bazie danych.</CardDescription>
+          <CardTitle className="text-lg">Wszystkie dokumenty ({invoices.length})</CardTitle>
+          <CardDescription>Zalecane: Wyczyść bazę przed ponownym importem plików XML z nowym parserem.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
