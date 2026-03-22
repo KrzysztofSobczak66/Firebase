@@ -5,7 +5,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { gemini15Flash } from '@genkit-ai/google-genai';
 
 const AddressSchema = z.object({
   street: z.string().describe('Street and building number.'),
@@ -38,7 +37,6 @@ export type PdfInvoiceDataExtractionOutput = z.infer<typeof PdfInvoiceDataExtrac
 
 const pdfPrompt = ai.definePrompt({
   name: 'pdfInvoiceDataExtractionPrompt',
-  model: gemini15Flash,
   input: { schema: PdfInvoiceDataExtractionInputSchema },
   output: { schema: PdfInvoiceDataExtractionOutputSchema },
   prompt: `Extract structured data from this PDF invoice: {{media url=pdfDataUri}}`,

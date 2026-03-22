@@ -1,5 +1,5 @@
 import { genkit } from 'genkit';
-import { googleAI, gemini15Flash } from '@genkit-ai/google-genai';
+import { googleAI } from '@genkit-ai/google-genai';
 import { config } from 'dotenv';
 
 // Wymuszenie załadowania zmiennych środowiskowych z .env
@@ -11,5 +11,5 @@ export const ai = genkit({
       apiKey: process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
     })
   ],
-  model: gemini15Flash, // Używamy bezpośredniego obiektu modelu zamiast stringa 'googleai/gemini-1.5-flash'
+  model: 'googleai/gemini-1.5-flash',
 });
