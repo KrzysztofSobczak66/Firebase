@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -20,7 +19,8 @@ import {
   UserCheck, 
   ShieldCheck,
   Search,
-  Trash2
+  Trash2,
+  Users
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase"
@@ -45,10 +45,6 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      // Pobieramy profile użytkowników z kolekcji globalnej (jeśli taką stworzymy)
-      // W tym modelu zakładamy, że profile są w /users/{uid}/profile
-      // Uwaga: Ze względu na ograniczenia SDK klienta, listowanie użytkowników z Firebase Auth 
-      // wymaga Admin SDK, ale tutaj listujemy dokumenty z Firestore, które tworzymy przy rejestracji.
       const q = query(collection(db, "userProfiles"), orderBy("createdAt", "desc"))
       const snapshot = await getDocs(q)
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
