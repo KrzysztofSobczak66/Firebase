@@ -60,12 +60,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) return null
 
-  // Definicja elementów nawigacji z filtrowaniem uprawnień
-  const navItems = [
-    { label: "Lista Faktur", icon: FileText, href: "/dashboard/invoices", show: true },
-    { label: "Masowy Import", icon: Upload, href: "/dashboard/admin/import", show: isAdmin },
-    { label: "Użytkownicy", icon: Users, href: "/dashboard/admin/users", show: isAdmin },
-    { label: "Administracja", icon: ShieldAlert, href: "/dashboard/admin", show: isAdmin },
+  // Nawigacja widoczna dla wszystkich
+  const publicNav = [
+    { label: "Lista Faktur", icon: FileText, href: "/dashboard/invoices" },
+  ]
+
+  // Nawigacja widoczna tylko dla administratorów
+  const adminNav = [
+    { label: "Masowy Import", icon: Upload, href: "/dashboard/admin/import" },
+    { label: "Użytkownicy", icon: Users, href: "/dashboard/admin/users" },
+    { label: "Administracja", icon: ShieldAlert, href: "/dashboard/admin" },
   ]
 
   return (
@@ -90,17 +94,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupLabel className="text-white/60 px-4 mb-2 uppercase text-[10px] font-bold tracking-widest">
-                Dokumenty i System
+                Dokumenty
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navItems.filter(i => i.show).map((item) => (
+                  {publicNav.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton 
                         asChild 
                         isActive={pathname === item.href}
                         tooltip={item.label}
-                        className="transition-all duration-200"
                       >
                         <Link href={item.href} className="flex items-center gap-3 py-6">
                           <item.icon className="h-5 w-5" />
@@ -112,9 +115,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            {isAdmin && (
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-white/60 px-4 mb-2 uppercase text-[10px] font-bold tracking-widest">
+                  Zarządzanie Systemem
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {adminNav.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton 
+                          asChild 
+                          isActive={pathname === item.href}
+                          tooltip={item.label}
+                        >
+                          <Link href={item.href} className="flex items-center gap-3 py-6">
+                            <item.icon className="h-5 w-5" />
+                            <span className="font-medium">{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
             
             <SidebarGroup className="mt-auto">
-              <SidebarGroupLabel className="text-white/60 px-4 mb-2 uppercase text-[10px] font-bold tracking-widest">
+              <SidebarGroupLabel className="text-white/60 px-4 mb-2 uppercase text-[10px] font-bold tracking-widest truncate max-w-[180px]">
                 Konto: {user.email}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -136,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <SidebarTrigger className="md:hidden" />
             <div className="flex-1 flex items-center justify-between">
               <h1 className="text-2xl font-bold text-foreground font-headline">
-                {navItems.find(i => i.href === pathname)?.label || "KSeF Studio"}
+                {publicNav.find(i => i.href === pathname)?.label || adminNav.find(i => i.href === pathname)?.label || "KSeF Studio"}
               </h1>
             </div>
           </header>

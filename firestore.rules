@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- HELPER FUNCTIONS ---
+    // --- FUNKCJE POMOCNICZE ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -14,25 +14,21 @@ service cloud.firestore {
       );
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
+    // --- REGUŁY ---
 
-    // --- RULES ---
-
-    // Profile użytkowników - admin widzi wszystkich, użytkownik tylko siebie
-    match /userProfiles/{userId} {
-      allow read: if isAdmin() || isOwner(userId);
-      allow write: if isOwner(userId);
-    }
-
-    // Globalna kolekcja faktur
+    // Faktury: Każdy zalogowany może czytać, tylko admin może pisać
     match /invoices/{invoiceId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    // Profile użytkowników: Admin widzi wszystkich, użytkownik tylko siebie (do celów logowania)
+    match /userProfiles/{userId} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
+      allow write: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
+    }
     
-    // Fallback
+    // Blokada pozostałych
     match /{document=**} {
       allow read, write: if false;
     }

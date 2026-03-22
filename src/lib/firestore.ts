@@ -7,28 +7,22 @@ import {
   deleteDoc, 
   doc, 
   updateDoc, 
-  getFirestore,
   limit,
-  writeBatch,
-  setDoc
+  writeBatch
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { initializeFirebase } from "@/firebase";
 
 const { firebaseApp, firestore: db } = initializeFirebase();
 
-const LOCAL_STORAGE_KEY = 'ksef_invoices_local_db';
 const INVOICES_COLLECTION = "invoices";
 
 // Lista administratorów
 const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu'];
 
-function getLocalInvoices() {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
-}
-
+/**
+ * Sprawdza czy faktura o danym numerze już istnieje w globalnej bazie.
+ */
 export async function findInvoiceByDetails(invoiceNumber: string) {
   if (!invoiceNumber) return null;
   
@@ -47,15 +41,17 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
   }
 }
 
+/**
+ * Zapisuje fakturę w globalnej kolekcji. Dostępne tylko dla administratorów.
+ */
 export async function saveInvoice(invoiceData: any) {
   try {
     const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
     const isAdmin = user && adminEmails.includes(user.email || '');
 
-    // Tylko admin może zapisywać w Firebase
     if (!isAdmin) {
-      throw new Error("Brak uprawnień do zapisu.");
+      throw new Error("Brak uprawnień do zapisu. Tylko administrator może modyfikować bazę.");
     }
 
     const existing = await findInvoiceByDetails(invoiceData.invoiceNumber);
@@ -84,6 +80,9 @@ export async function saveInvoice(invoiceData: any) {
   }
 }
 
+/**
+ * Pobiera wszystkie faktury z globalnej kolekcji.
+ */
 export async function getAllInvoices() {
   try {
     const querySnapshot = await getDocs(collection(db, INVOICES_COLLECTION));
@@ -93,26 +92,32 @@ export async function getAllInvoices() {
     }));
   } catch (error) {
     console.error("Błąd pobierania faktur:", error);
-    return getLocalInvoices();
+    return [];
   }
 }
 
+/**
+ * Usuwa fakturę. Dostępne tylko dla administratorów.
+ */
 export async function deleteInvoice(id: string) {
   const auth = getAuth(firebaseApp);
   const user = auth.currentUser;
   const isAdmin = user && adminEmails.includes(user.email || '');
 
-  if (!isAdmin) throw new Error("Brak uprawnień.");
+  if (!isAdmin) throw new Error("Brak uprawnień do usuwania.");
 
   await deleteDoc(doc(db, INVOICES_COLLECTION, id));
 }
 
+/**
+ * Czyści całą bazę faktur. Dostępne tylko dla administratorów.
+ */
 export async function deleteAllInvoices() {
   const auth = getAuth(firebaseApp);
   const user = auth.currentUser;
   const isAdmin = user && adminEmails.includes(user.email || '');
 
-  if (!isAdmin) throw new Error("Brak uprawnień.");
+  if (!isAdmin) throw new Error("Brak uprawnień do czyszczenia bazy.");
 
   try {
     const querySnapshot = await getDocs(collection(db, INVOICES_COLLECTION));
