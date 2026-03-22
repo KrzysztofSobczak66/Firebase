@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   addDoc, 
@@ -8,27 +9,34 @@ import {
   doc, 
   updateDoc, 
   limit,
-  writeBatch
+  writeBatch,
+  getFirestore
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { initializeFirebase } from "@/firebase";
 
-const { firebaseApp, firestore: db } = initializeFirebase();
-
-const INVOICES_COLLECTION = "invoices";
-
-// Lista administratorów
+// Lista administratorów - zsynchronizowana z layout.tsx
 const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu'];
+
+/**
+ * Funkcja pomocnicza do pobierania instancji bazy danych.
+ * Zapobiega błędom inicjalizacji na poziomie modułu.
+ */
+function getDb() {
+  const { firestore } = initializeFirebase();
+  return firestore;
+}
 
 /**
  * Sprawdza czy faktura o danym numerze już istnieje w globalnej bazie.
  */
 export async function findInvoiceByDetails(invoiceNumber: string) {
   if (!invoiceNumber) return null;
+  const db = getDb();
   
   try {
     const q = query(
-      collection(db, INVOICES_COLLECTION), 
+      collection(db, "invoices"), 
       where("invoiceNumber", "==", invoiceNumber),
       limit(1)
     );
@@ -45,6 +53,9 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
  * Zapisuje fakturę w globalnej kolekcji. Dostępne tylko dla administratorów.
  */
 export async function saveInvoice(invoiceData: any) {
+  const db = getDb();
+  const { firebaseApp } = initializeFirebase();
+  
   try {
     const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
@@ -63,12 +74,12 @@ export async function saveInvoice(invoiceData: any) {
     };
 
     if (existing) {
-      const docRef = doc(db, INVOICES_COLLECTION, existing.id);
+      const docRef = doc(db, "invoices", existing.id);
       await updateDoc(docRef, dataToSave);
       return { status: 'updated', id: existing.id };
     }
 
-    const docRef = await addDoc(collection(db, INVOICES_COLLECTION), {
+    const docRef = await addDoc(collection(db, "invoices"), {
       ...dataToSave,
       createdAt: new Date().toISOString(),
       status: 'ACCEPTED'
@@ -84,8 +95,9 @@ export async function saveInvoice(invoiceData: any) {
  * Pobiera wszystkie faktury z globalnej kolekcji.
  */
 export async function getAllInvoices() {
+  const db = getDb();
   try {
-    const querySnapshot = await getDocs(collection(db, INVOICES_COLLECTION));
+    const querySnapshot = await getDocs(collection(db, "invoices"));
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -100,19 +112,23 @@ export async function getAllInvoices() {
  * Usuwa fakturę. Dostępne tylko dla administratorów.
  */
 export async function deleteInvoice(id: string) {
+  const db = getDb();
+  const { firebaseApp } = initializeFirebase();
   const auth = getAuth(firebaseApp);
   const user = auth.currentUser;
   const isAdmin = user && adminEmails.includes(user.email || '');
 
   if (!isAdmin) throw new Error("Brak uprawnień do usuwania.");
 
-  await deleteDoc(doc(db, INVOICES_COLLECTION, id));
+  await deleteDoc(doc(db, "invoices", id));
 }
 
 /**
  * Czyści całą bazę faktur. Dostępne tylko dla administratorów.
  */
 export async function deleteAllInvoices() {
+  const db = getDb();
+  const { firebaseApp } = initializeFirebase();
   const auth = getAuth(firebaseApp);
   const user = auth.currentUser;
   const isAdmin = user && adminEmails.includes(user.email || '');
@@ -120,12 +136,12 @@ export async function deleteAllInvoices() {
   if (!isAdmin) throw new Error("Brak uprawnień do czyszczenia bazy.");
 
   try {
-    const querySnapshot = await getDocs(collection(db, INVOICES_COLLECTION));
+    const querySnapshot = await getDocs(collection(db, "invoices"));
     if (querySnapshot.empty) return true;
 
     const batch = writeBatch(db);
     querySnapshot.docs.forEach((d) => {
-      batch.delete(doc(db, INVOICES_COLLECTION, d.id));
+      batch.delete(doc(db, "invoices", d.id));
     });
     await batch.commit();
     return true;

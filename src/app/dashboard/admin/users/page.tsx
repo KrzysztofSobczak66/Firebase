@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -92,9 +93,11 @@ export default function AdminUsersPage() {
           </h2>
           <p className="text-slate-500">Przeglądaj i zarządzaj dostępem do systemu.</p>
         </div>
-        <Button onClick={() => router.push('/login')} variant="outline" className="font-bold">
-          <UserPlus className="h-4 w-4 mr-2" /> Dodaj nowego użytkownika
-        </Button>
+        <div className="flex gap-2">
+           <Button onClick={() => fetchUsers()} variant="outline" disabled={loading}>
+             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Odśwież listę"}
+           </Button>
+        </div>
       </div>
 
       <Card className="border-none shadow-sm overflow-hidden bg-white">
@@ -185,9 +188,10 @@ export default function AdminUsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate-600 space-y-2">
-            <p>1. Poproś użytkownika o samodzielną rejestrację przez stronę główną.</p>
-            <p>2. Po pierwszym zalogowaniu użytkownik pojawi się na powyższej liście.</p>
-            <p>3. Jego dane (faktury) będą automatycznie izolowane od innych użytkowników.</p>
+            <p>1. Udostępnij link do aplikacji swojemu współpracownikowi.</p>
+            <p>2. Poproś go o samodzielną rejestrację przez stronę główną.</p>
+            <p>3. Po pierwszym zalogowaniu użytkownik pojawi się na powyższej liście.</p>
+            <p>4. Każdy zarejestrowany użytkownik ma dostęp do wspólnej bazy faktur w trybie "tylko do odczytu".</p>
           </CardContent>
         </Card>
       </div>
