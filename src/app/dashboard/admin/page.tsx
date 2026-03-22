@@ -22,7 +22,8 @@ import {
   ExternalLink,
   ShieldCheck,
   LayoutDashboard,
-  Rocket
+  Rocket,
+  CreditCard
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getAllInvoices, deleteInvoice, deleteAllInvoices } from "@/lib/firestore"
@@ -158,38 +159,38 @@ export default function AdminPage() {
                 <Globe className="h-5 w-5" /> Udostępnianie w sieci
               </CardTitle>
               <CardDescription>
-                Twoja aplikacja jest gotowa. Postępuj zgodnie z krokami poniżej:
+                Kroki do uruchomienia aplikacji Next.js:
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-slate-600 space-y-4">
               <div className="space-y-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
                 <p className="font-bold text-amber-800 flex items-center gap-2">
-                  <Rocket className="h-4 w-4" /> Ważna informacja:
+                  <CreditCard className="h-4 w-4" /> Krok 1: Plan Blaze
                 </p>
                 <p className="text-amber-700 text-xs">
-                  Widoczny u Ciebie status "Waiting for your first release" oznacza, że musisz dokończyć konfigurację <b>App Hosting</b> (nie zwykłego Hostingu).
+                  App Hosting wymaga planu <b>Blaze (Pay-as-you-go)</b>. Kliknij "Upgrade project" w konsoli i podepnij kartę. Nie martw się – limity darmowe są bardzo wysokie.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <p className="font-bold text-slate-900">Kroki do publikacji:</p>
+                <p className="font-bold text-slate-900">Krok 2: Konfiguracja App Hosting:</p>
                 <ol className="list-decimal list-inside space-y-3">
                   <li>Otwórz <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary font-bold underline inline-flex items-center gap-1">Konsolę Firebase <ExternalLink className="h-3 w-3" /></a>.</li>
-                  <li>W menu po lewej wybierz <b>Build</b>, a następnie <b>App Hosting</b>.</li>
-                  <li>Kliknij <b>"Get started"</b> i połącz swoje repozytorium GitHub.</li>
-                  <li>Wybierz gałąź (zazwyczaj <b>main</b>) i kliknij "Deploy".</li>
-                  <li>Firebase rozpocznie proces budowania. Po kilku minutach status zmieni się na <b>"Active"</b> i otrzymasz działający link.</li>
+                  <li>W menu <b>Build</b> wybierz <b>App Hosting</b> (nie zwykły Hosting).</li>
+                  <li>Kliknij <b>"Get started"</b> i połącz repozytorium GitHub.</li>
+                  <li>Wybierz gałąź <b>main</b> i kliknij "Deploy".</li>
+                  <li>Firebase zbuduje aplikację (ok. 5-10 min) i nada jej działający link.</li>
                 </ol>
               </div>
               
               <div className="p-4 bg-white rounded-lg border border-primary/20">
                 <p className="text-xs font-bold text-primary mb-2 flex items-center gap-2">
-                  <LayoutDashboard className="h-3 w-3" /> Konsola Firebase
+                  <LayoutDashboard className="h-3 w-3" /> Gotowy do publikacji?
                 </p>
-                <p className="text-xs mb-3 text-slate-500">Po wdrożeniu, adres Twojej aplikacji znajdziesz w zakładce App Hosting.</p>
+                <p className="text-xs mb-3 text-slate-500">Po wdrożeniu otrzymasz link, który wyślesz użytkownikom.</p>
                 <Button variant="default" className="w-full bg-primary" asChild>
                   <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">
-                    Przejdź do Konsoli <ExternalLink className="h-3 w-3 ml-2" />
+                    Otwórz Konsolę Firebase <ExternalLink className="h-3 w-3 ml-2" />
                   </a>
                 </Button>
               </div>
@@ -207,7 +208,7 @@ export default function AdminPage() {
               <p>Uprawnienia: <span className="text-green-600 font-bold">SUPER ADMINISTRATOR</span></p>
               <hr className="my-3" />
               <p className="text-xs italic">
-                Każdy nowy użytkownik, który zarejestruje się przez link, otrzyma automatycznie uprawnienia <b>Tylko do odczytu</b>.
+                Pamiętaj: Jako administrator masz jedyny dostęp do importu XML i usuwania danych. Inni użytkownicy będą widzieć tylko listę faktur.
               </p>
             </CardContent>
           </Card>
