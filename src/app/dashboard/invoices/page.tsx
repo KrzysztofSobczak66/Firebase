@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { useUser } from "@/firebase"
 import html2canvas from "html2canvas"
-import jsPDF from "jsPDF"
+import jsPDF from "jspdf"
 
 const PAGE_SIZE = 50
 
