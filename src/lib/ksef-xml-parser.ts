@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Zaawansowany parser XML dla KSeF FA(3).
  * Wyciąga wszystkie dane: Podmiot 1, 2, 3, płatności, pełne adresy, kaucje i zestawienia VAT.
@@ -99,9 +100,14 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       const els = getEls(tagName);
       if (els.length === 0) return undefined;
       const el = els[0];
+      const nip = getVal("NIP", el);
+      const name = getVal("Nazwa", el);
+      
+      if (!nip && !name) return undefined;
+
       return {
-        name: getVal("Nazwa", el),
-        nip: getVal("NIP", el),
+        name: name || "Brak nazwy",
+        nip: nip || "Brak NIP",
         addressL1: getVal("AdresL1", el),
         addressL2: getVal("AdresL2", el),
         countryCode: getVal("KodKraju", el) || "PL",
@@ -143,13 +149,12 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
     const amountToPay = parseFloat(getVal("DoZaplaty").replace(",", ".")) || gross;
     
-    // Obliczanie całkowitej kwoty netto (z zestawienia VAT lub sumy pozycji)
     let totalNet = vats.reduce((s, v) => s + v.net, 0);
     if (totalNet === 0) {
       totalNet = items.reduce((s, i) => s + i.netValue, 0);
     }
     if (totalNet === 0 && gross !== 0) {
-      totalNet = gross / 1.23; // Bardzo zgrubne przybliżenie jeśli brak danych
+      totalNet = gross / 1.23;
     }
 
     return {
@@ -163,7 +168,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       documentType: mapDocumentType(typeCode),
       seller,
       buyer,
-      recipient,
+      recipient, // może być undefined, co obsłuży sanityzacja w firestore.ts
       bankAccount: getVal("NrRB"),
       bankName: getVal("NazwaBanku"),
       totalNet: totalNet,

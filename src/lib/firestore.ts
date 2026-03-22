@@ -15,12 +15,18 @@ import {
 import { getAuth } from "firebase/auth";
 import { initializeFirebase } from "@/firebase";
 
-// Lista administratorów - zsynchronizowana z layout.tsx
+// Lista administratorów
 const adminEmails = ['admin@ksef.pl', 'krzysztof.sobczak@sp-partner.eu'];
 
 /**
+ * Czyści obiekt z wartości 'undefined', których Firestore nie akceptuje.
+ */
+function sanitizeForFirestore(data: any): any {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/**
  * Funkcja pomocnicza do pobierania instancji bazy danych.
- * Zapobiega błędom inicjalizacji na poziomie modułu.
  */
 function getDb() {
   const { firestore } = initializeFirebase();
@@ -67,20 +73,21 @@ export async function saveInvoice(invoiceData: any) {
 
     const existing = await findInvoiceByDetails(invoiceData.invoiceNumber);
     
-    const dataToSave = {
+    // Usuwamy undefined przed zapisem
+    const cleanData = sanitizeForFirestore({
       ...invoiceData,
       lastModifiedBy: user.email,
       updatedAt: new Date().toISOString()
-    };
+    });
 
     if (existing) {
       const docRef = doc(db, "invoices", existing.id);
-      await updateDoc(docRef, dataToSave);
+      await updateDoc(docRef, cleanData);
       return { status: 'updated', id: existing.id };
     }
 
     const docRef = await addDoc(collection(db, "invoices"), {
-      ...dataToSave,
+      ...cleanData,
       createdAt: new Date().toISOString(),
       status: 'ACCEPTED'
     });
