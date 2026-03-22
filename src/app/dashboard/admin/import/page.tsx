@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from "react"
@@ -19,7 +18,6 @@ export default function AdminImportPage() {
   const [stats, setStats] = useState({ added: 0, updated: 0, total: 0, errors: 0 })
   const { toast } = useToast()
 
-  // Sprawdzanie konfiguracji
   const isFirebaseConfigured = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
                               process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'TWÓJ_API_KEY' &&
                               process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'dummy-key';
@@ -41,12 +39,10 @@ export default function AdminImportPage() {
     try {
       let dataToSave: any = null;
 
-      // 1. Parsowanie lokalne dla XML (Błyskawiczne, bez AI)
       if (file.name.toLowerCase().endsWith('.xml')) {
         const content = await file.text()
         dataToSave = parseKSeFXMLClient(content)
       } 
-      // 2. Parsowanie przez AI dla PDF
       else if (file.name.toLowerCase().endsWith('.pdf')) {
         if (!isAiConfigured) {
           throw new Error("Brak klucza API dla Gemini (wymagany dla PDF)")
@@ -61,7 +57,6 @@ export default function AdminImportPage() {
         }
       }
 
-      // 3. Zapis do bazy danych (Firestore)
       if (dataToSave) {
         if (!isFirebaseConfigured) {
             console.warn("Brak Firebase - symulacja zapisu dla:", file.name);
@@ -122,7 +117,7 @@ export default function AdminImportPage() {
 
         <Alert className="bg-blue-50 border-blue-200">
           <ShieldCheck className="h-4 w-4 text-blue-600" />
-          <AlertTitle>Błyskawiczny import XML aktywny</ShieldCheck>
+          <AlertTitle>Błyskawiczny import XML aktywny</AlertTitle>
           <AlertDescription>
             Twoje pliki XML są przetwarzane bezpośrednio w przeglądarce. Działa to natychmiastowo i bez użycia AI.
           </AlertDescription>

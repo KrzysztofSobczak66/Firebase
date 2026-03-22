@@ -24,7 +24,8 @@ const firebaseConfig = {
 function getFirebaseApp() {
   if (getApps().length > 0) return getApp();
   
-  const isConfigured = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('TWÓJ');
+  const apiKey = firebaseConfig.apiKey;
+  const isConfigured = !!apiKey && !apiKey.includes('TWÓJ') && apiKey !== 'dummy-key';
   
   if (!isConfigured) {
     console.warn("Baza danych nie jest skonfigurowana. Dane nie zostaną zapisane w chmurze.");
@@ -38,7 +39,9 @@ const app = getFirebaseApp();
 export const db = getFirestore(app);
 
 export async function findInvoiceByDetails(invoiceNumber: string) {
-  if (!invoiceNumber || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('TWÓJ')) return null;
+  if (!invoiceNumber) return null;
+  const apiKey = firebaseConfig.apiKey;
+  if (!apiKey || apiKey.includes('TWÓJ') || apiKey === 'dummy-key') return null;
   
   try {
     const q = query(
@@ -56,7 +59,8 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
 }
 
 export async function saveInvoice(invoiceData: any) {
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('TWÓJ')) {
+  const apiKey = firebaseConfig.apiKey;
+  if (!apiKey || apiKey.includes('TWÓJ') || apiKey === 'dummy-key') {
     throw new Error("Brak konfiguracji Firebase w pliku .env");
   }
 
@@ -86,7 +90,8 @@ export async function saveInvoice(invoiceData: any) {
 }
 
 export async function getAllInvoices() {
-  if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('TWÓJ')) return [];
+  const apiKey = firebaseConfig.apiKey;
+  if (!apiKey || apiKey.includes('TWÓJ') || apiKey === 'dummy-key') return [];
   try {
     const querySnapshot = await getDocs(collection(db, "invoices"));
     return querySnapshot.docs.map(doc => ({
