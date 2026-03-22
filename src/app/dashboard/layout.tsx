@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -9,11 +8,11 @@ import {
   Upload, 
   User, 
   LogOut, 
-  Menu,
   FilePlus,
   Search,
   Settings,
-  ShieldAlert
+  ShieldAlert,
+  Loader2
 } from "lucide-react"
 
 import { 
@@ -33,10 +32,36 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useUser, useAuth } from "@/firebase"
+import { signOut } from "firebase/auth"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, isUserLoading } = useUser()
+  const auth = useAuth()
+
+  React.useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, isUserLoading, router])
+
+  const handleLogout = async () => {
+    await signOut(auth)
+    router.push('/login')
+  }
+
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!user) return null
 
   const navItems = [
     { label: "Panel główny", icon: LayoutDashboard, href: "/dashboard" },
@@ -60,7 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center">
                 <FileText className="text-primary h-6 w-6" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-white">KSeF Faktury</span>
+              <span className="text-xl font-bold tracking-tight text-white">KSeF Studio</span>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -91,7 +116,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             
             <SidebarGroup className="mt-auto">
               <SidebarGroupLabel className="text-white/60 px-4 mb-2 uppercase text-[10px] font-bold tracking-widest">
-                System
+                Użytkownik: {user.email?.split('@')[0]}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -110,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </SidebarMenuItem>
                   ))}
                   <SidebarMenuItem>
-                    <SidebarMenuButton className="text-white/80 hover:text-white mt-4">
+                    <SidebarMenuButton onClick={handleLogout} className="text-white/80 hover:text-white mt-4">
                       <LogOut className="h-5 w-5" />
                       <span>Wyloguj się</span>
                     </SidebarMenuButton>

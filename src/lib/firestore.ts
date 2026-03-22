@@ -11,36 +11,25 @@ import {
   limit,
   writeBatch
 } from "firebase/firestore";
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { initializeFirebase } from "@/firebase";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+const { firebaseApp, firestore: db } = initializeFirebase();
 
 const LOCAL_STORAGE_KEY = 'ksef_invoices_local_db';
 
-export const isFirebaseConfigured = !!firebaseConfig.apiKey && 
-                                   !firebaseConfig.apiKey.includes('TWÓJ') && 
-                                   firebaseConfig.apiKey !== 'dummy-key' &&
-                                   firebaseConfig.apiKey.length > 10;
-
-function getFirebaseApp() {
-  if (getApps().length > 0) return getApp();
-  
-  if (!isFirebaseConfigured) {
-    return initializeApp({ ...firebaseConfig, apiKey: 'dummy-key', projectId: 'demo-project' });
-  }
-  
-  return initializeApp(firebaseConfig);
+// Pomocnicza funkcja do pobierania UID aktualnego użytkownika
+function getCurrentUserId() {
+  const auth = getAuth(firebaseApp);
+  return auth.currentUser?.uid;
 }
 
-const app = getFirebaseApp();
-export const db = getFirestore(app);
+// Ścieżka do kolekcji faktur użytkownika
+function getUserInvoicesPath() {
+  const uid = getCurrentUserId();
+  if (!uid) return null;
+  return `users/${uid}/companyProfile/invoices`;
+}
 
 function getLocalInvoices() {
   if (typeof window === 'undefined') return [];
@@ -78,11 +67,12 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
   const foundLocal = local.find((inv: any) => inv.invoiceNumber === invoiceNumber);
   if (foundLocal) return foundLocal;
 
-  if (!isFirebaseConfigured) return null;
+  const path = getUserInvoicesPath();
+  if (!path) return null;
   
   try {
     const q = query(
-      collection(db, "invoices"), 
+      collection(db, path), 
       where("invoiceNumber", "==", invoiceNumber),
       limit(1)
     );
@@ -96,26 +86,34 @@ export async function findInvoiceByDetails(invoiceNumber: string) {
 }
 
 export async function saveInvoice(invoiceData: any) {
-  saveToLocal(invoiceData);
-
-  if (!isFirebaseConfigured) {
+  const path = getUserInvoicesPath();
+  
+  if (!path) {
+    saveToLocal(invoiceData);
     return { status: 'added', id: 'local-id' };
   }
 
   try {
     const existing = await findInvoiceByDetails(invoiceData.invoiceNumber);
     
+    const uid = getCurrentUserId();
+    const dataWithUser = {
+      ...invoiceData,
+      userId: uid,
+      companyProfileId: 'companyProfile' // Uproszczenie dla MVP
+    };
+
     if (existing && !existing.id.startsWith('local-')) {
-      const docRef = doc(db, "invoices", existing.id);
+      const docRef = doc(db, path, existing.id);
       await updateDoc(docRef, {
-        ...invoiceData,
+        ...dataWithUser,
         updatedAt: new Date().toISOString()
       });
       return { status: 'updated', id: existing.id };
     }
 
-    const docRef = await addDoc(collection(db, "invoices"), {
-      ...invoiceData,
+    const docRef = await addDoc(collection(db, path), {
+      ...dataWithUser,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: 'ACCEPTED'
@@ -129,26 +127,20 @@ export async function saveInvoice(invoiceData: any) {
 
 export async function getAllInvoices() {
   const localInvoices = getLocalInvoices();
+  const path = getUserInvoicesPath();
   
-  if (!isFirebaseConfigured) {
+  if (!path) {
     return localInvoices;
   }
 
   try {
-    const querySnapshot = await getDocs(collection(db, "invoices"));
+    const querySnapshot = await getDocs(collection(db, path));
     const firestoreInvoices = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     
-    const merged = [...firestoreInvoices];
-    localInvoices.forEach((localInv: any) => {
-      if (!merged.some(f => f.invoiceNumber === localInv.invoiceNumber)) {
-        merged.push(localInv);
-      }
-    });
-    
-    return merged;
+    return firestoreInvoices;
   } catch (error) {
     console.error("Błąd pobierania faktur:", error);
     return localInvoices;
@@ -156,6 +148,7 @@ export async function getAllInvoices() {
 }
 
 export async function deleteInvoice(id: string) {
+  const path = getUserInvoicesPath();
   if (id.startsWith('local-')) {
     const current = getLocalInvoices();
     const updated = current.filter((inv: any) => inv.id !== id);
@@ -163,52 +156,30 @@ export async function deleteInvoice(id: string) {
     return;
   }
 
-  if (!isFirebaseConfigured) return;
-  await deleteDoc(doc(db, "invoices", id));
+  if (!path) return;
+  await deleteDoc(doc(db, path, id));
 }
 
 export async function deleteAllInvoices() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
-    console.log("Local storage wyczyszczone.");
   }
 
-  if (!isFirebaseConfigured) {
-    return true;
-  }
+  const path = getUserInvoicesPath();
+  if (!path) return true;
 
   try {
-    const querySnapshot = await getDocs(collection(db, "invoices"));
+    const querySnapshot = await getDocs(collection(db, path));
     if (querySnapshot.empty) return true;
 
     const batch = writeBatch(db);
     querySnapshot.docs.forEach((d) => {
-      batch.delete(doc(db, "invoices", d.id));
+      batch.delete(doc(db, path, d.id));
     });
     await batch.commit();
-    console.log("Firestore wyczyszczone.");
     return true;
   } catch (error) {
     console.error("Błąd czyszczenia bazy danych:", error);
     throw error;
   }
-}
-
-export async function updateInvoice(id: string, data: any) {
-  if (id.startsWith('local-')) {
-    const current = getLocalInvoices();
-    const index = current.findIndex((inv: any) => inv.id === id);
-    if (index >= 0) {
-      current[index] = { ...current[index], ...data, updatedAt: new Date().toISOString() };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(current));
-    }
-    return;
-  }
-
-  if (!isFirebaseConfigured) return;
-  const docRef = doc(db, "invoices", id);
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: new Date().toISOString()
-  });
 }
