@@ -1,6 +1,7 @@
 'use server';
 /**
  * @fileOverview Ekstrakcja danych z PDF przy użyciu Gemini 1.5 Flash.
+ * Zoptymalizowana pod kątem stabilności i obsługi błędów.
  */
 
 import {ai} from '@/ai/genkit';
@@ -22,37 +23,45 @@ export type PdfInvoiceDataExtractionOutput = z.infer<typeof PdfInvoiceDataExtrac
  * Analizuje PDF i wyciąga dane faktury.
  */
 export async function extractPdfInvoiceData(input: { pdfDataUri: string }): Promise<PdfInvoiceDataExtractionOutput> {
-  console.log("Rozpoczynam analizę AI dla pliku PDF...");
+  console.log("URUCHAMIAM ANALIZĘ PDF (Gemini 1.5 Flash)...");
   
+  if (!input.pdfDataUri) {
+    throw new Error("Brak danych pliku PDF.");
+  }
+
   try {
     const response = await ai.generate({
       model: 'googleai/gemini-1.5-flash',
       prompt: [
-        { text: 'Jesteś ekspertem od polskich faktur. Przeanalizuj ten plik PDF i wyciągnij: numer faktury, datę wystawienia (format YYYY-MM-DD), pełną nazwę sprzedawcy, NIP sprzedawcy oraz łączną kwotę brutto. Zwróć dane w formacie JSON zgodnym ze schematem.' },
+        { text: 'Przeanalizuj tę fakturę i wyciągnij: numer faktury, datę wystawienia (YYYY-MM-DD), nazwę sprzedawcy, NIP sprzedawcy oraz kwotę brutto. Zwróć tylko JSON.' },
         { media: { url: input.pdfDataUri, contentType: 'application/pdf' } }
       ],
-      output: { schema: PdfInvoiceDataExtractionOutputSchema }
+      output: { schema: PdfInvoiceDataExtractionOutputSchema },
+      config: {
+        safetySettings: [
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+        ]
+      }
     });
     
     if (!response.output) {
-      throw new Error('Model AI nie zwrócił ustrukturyzowanych danych. Upewnij się, że PDF jest czytelny i zawiera fakturę.');
+      console.error("Model AI nie zwrócił ustrukturyzowanych danych.");
+      throw new Error('AI nie rozpoznało danych na fakturze. Upewnij się, że plik jest czytelnym dokumentem PDF.');
     }
     
-    console.log("Analiza AI zakończona sukcesem:", response.output.invoiceNumber);
+    console.log("SUKCES ANALIZY PDF:", response.output.invoiceNumber);
     return response.output;
   } catch (error: any) {
-    console.error("SZCZEGÓŁOWY BŁĄD GEMINI:", error);
+    console.error("KRYTYCZNY BŁĄD GEMINI:", error.message);
     
-    // Obsługa błędów autoryzacji
-    if (error.message?.includes('401') || error.message?.includes('API_KEY') || error.message?.includes('auth')) {
-      throw new Error('BŁĄD KLUCZA API: Twój klucz Gemini jest nieważny lub niepoprawnie wklejony w pliku .env.');
+    if (error.message?.includes('401') || error.message?.includes('API_KEY')) {
+      throw new Error('NIEPRAWIDŁOWY KLUCZ API: Sprawdź plik .env i upewnij się, że klucz GEMINI_API_KEY jest poprawny.');
     }
     
-    // Obsługa limitów (Quotas)
     if (error.message?.includes('429')) {
-      throw new Error('LIMIT PRZEKROCZONY: Zbyt wiele zapytań do AI w krótkim czasie. Odczekaj chwilę.');
+      throw new Error('LIMIT PRZEKROCZONY: Zbyt wiele zapytań do AI. Poczekaj minutę i spróbuj ponownie.');
     }
 
-    throw new Error(`Błąd AI: ${error.message || 'Nieznany problem z modelem Gemini'}`);
+    throw new Error(`Błąd AI: ${error.message || 'Problem z połączeniem z Gemini'}`);
   }
 }
