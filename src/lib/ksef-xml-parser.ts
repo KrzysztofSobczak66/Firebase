@@ -37,8 +37,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
 
     // Pomocnicza funkcja do pobierania wartości taga bez względu na prefiks (ns0:, itp.)
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
-      // Szukamy elementu o danej nazwie lokalnej
-      const elements = parent.querySelectorAll(`*`);
+      const elements = parent.getElementsByTagName("*");
       for (let i = 0; i < elements.length; i++) {
         if (elements[i].localName === tagName) {
           return elements[i].textContent?.trim() || "";
@@ -49,11 +48,11 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
 
     // Pomocnicza funkcja do pobierania listy elementów o danej nazwie lokalnej
     const getEls = (tagName: string, parent: Element | Document = xmlDoc) => {
-      const all = parent.querySelectorAll(`*`);
+      const all = parent.getElementsByTagName("*");
       const result: Element[] = [];
-      all.forEach(el => {
-        if (el.localName === tagName) result.push(el);
-      });
+      for (let i = 0; i < all.length; i++) {
+        if (all[i].localName === tagName) result.push(all[i]);
+      }
       return result;
     };
 
@@ -89,20 +88,18 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const currency = getVal("KodWaluty") || "PLN";
 
     // Wyciąganie danych podmiotów
-    const sellerName = getVal("Nazwa", getEls("Podmiot1")[0] || xmlDoc);
-    const sellerNip = getVal("NIP", getEls("Podmiot1")[0] || xmlDoc);
-    const buyerName = getVal("Nazwa", getEls("Podmiot2")[0] || xmlDoc);
-    const buyerNip = getVal("NIP", getEls("Podmiot2")[0] || xmlDoc);
+    const sellerEl = getEls("Podmiot1")[0];
+    const buyerEl = getEls("Podmiot2")[0];
 
     const data: ParsedKSeF = {
       invoiceNumber: getVal("P_2"),
       invoiceDate: getVal("P_1"),
       saleDate: getVal("P_6") || getVal("P_1"),
-      sellerName,
-      sellerNip,
+      sellerName: getVal("Nazwa", sellerEl || xmlDoc),
+      sellerNip: getVal("NIP", sellerEl || xmlDoc),
       sellerAddress: getAddress("Podmiot1"),
-      buyerName,
-      buyerNip,
+      buyerName: getVal("Nazwa", buyerEl || xmlDoc),
+      buyerNip: getVal("NIP", buyerEl || xmlDoc),
       buyerAddress: getAddress("Podmiot2"),
       totalNet: items.reduce((sum, item) => sum + item.netValue, 0) || gross,
       totalVat: items.reduce((sum, item) => sum + item.vatValue, 0),

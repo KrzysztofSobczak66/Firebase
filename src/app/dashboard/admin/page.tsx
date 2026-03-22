@@ -60,14 +60,16 @@ export default function AdminPage() {
   }
 
   const handleDelete = async (id: string) => {
+    console.log("Usuwanie faktury:", id);
     if (!window.confirm("Czy na pewno chcesz usunąć tę fakturę?")) return
     
     setLoading(true)
     try {
       await deleteInvoice(id)
       setInvoices(prev => prev.filter(inv => inv.id !== id))
-      toast({ title: "Usunięto", description: "Faktura została usunięta z bazy." })
+      toast({ title: "Usunięto", description: "Faktura została usunięta." })
     } catch (error: any) {
+      console.error("Błąd usuwania:", error);
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
     } finally {
       setLoading(false)
@@ -75,7 +77,8 @@ export default function AdminPage() {
   }
 
   const handleClearAll = async () => {
-    if (!window.confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy? Te operacji nie da się cofnąć.")) return
+    console.log("Rozpoczynanie czyszczenia bazy...");
+    if (!window.confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury?")) return
     
     setClearing(true)
     try {
@@ -86,11 +89,11 @@ export default function AdminPage() {
         description: "Baza danych została wyczyszczona." 
       })
     } catch (error: any) {
-      console.error("Cleanup error:", error);
+      console.error("Błąd czyszczenia:", error);
       toast({ 
         variant: "destructive", 
-        title: "Błąd czyszczenia", 
-        description: error.message || "Wystąpił błąd podczas czyszczenia bazy." 
+        title: "Błąd", 
+        description: error.message || "Wystąpił błąd podczas czyszczenia." 
       })
     } finally {
       setClearing(false)
@@ -156,7 +159,7 @@ export default function AdminPage() {
             <ShieldAlert className="h-6 w-6 text-destructive" />
             Zarządzanie Bazą Danych
           </h2>
-          <p className="text-muted-foreground">Usuwanie i edycja faktur z bazy Firestore oraz pamięci lokalnej.</p>
+          <p className="text-muted-foreground">Usuwanie i edycja faktur z bazy danych.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchInvoices} disabled={loading || clearing}>
@@ -179,7 +182,7 @@ export default function AdminPage() {
       <Card className="border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">Wszystkie dokumenty ({invoices.length})</CardTitle>
-          <CardDescription>Zalecane: Wyczyść bazę przed ponownym importem plików XML z nowym parserem.</CardDescription>
+          <CardDescription>Edytuj lub usuwaj pojedyncze rekordy z bazy danych.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -264,7 +267,7 @@ export default function AdminPage() {
               {!loading && invoices.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                    Baza jest pusta. Użyj modułu importu, aby dodać faktury.
+                    Baza jest pusta.
                   </TableCell>
                 </TableRow>
               )}

@@ -141,7 +141,6 @@ export async function getAllInvoices() {
       ...doc.data()
     }));
     
-    // Merge local and firestore, prioritizing firestore version if numbers match
     const merged = [...firestoreInvoices];
     localInvoices.forEach((localInv: any) => {
       if (!merged.some(f => f.invoiceNumber === localInv.invoiceNumber)) {
@@ -169,13 +168,11 @@ export async function deleteInvoice(id: string) {
 }
 
 export async function deleteAllInvoices() {
-  // Clear local storage first (reliable)
   if (typeof window !== 'undefined') {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
-    console.log("Local storage cleared.");
+    console.log("Local storage wyczyszczone.");
   }
 
-  // Clear firestore if configured
   if (!isFirebaseConfigured) {
     return true;
   }
@@ -189,10 +186,10 @@ export async function deleteAllInvoices() {
       batch.delete(doc(db, "invoices", d.id));
     });
     await batch.commit();
-    console.log("Firestore collection cleared.");
+    console.log("Firestore wyczyszczone.");
     return true;
   } catch (error) {
-    console.error("Błąd podczas czyszczenia bazy danych:", error);
+    console.error("Błąd czyszczenia bazy danych:", error);
     throw error;
   }
 }
