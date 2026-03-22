@@ -60,30 +60,30 @@ export default function AdminPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Czy na pewno chcesz usunąć tę fakturę?")) return
+    if (!window.confirm("Czy na pewno chcesz usunąć tę fakturę?")) return
     
+    setLoading(true)
     try {
       await deleteInvoice(id)
       setInvoices(prev => prev.filter(inv => inv.id !== id))
       toast({ title: "Usunięto", description: "Faktura została usunięta z bazy." })
-    } catch (error) {
+    } catch (error: any) {
       toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleClearAll = async () => {
-    const isConfirmed = confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy (Firestore i LocalStorage)? Te operacji nie da się cofnąć.")
-    if (!isConfirmed) return
+    if (!window.confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy? Te operacji nie da się cofnąć.")) return
     
     setClearing(true)
-    console.log("Starting database cleanup...");
-    
     try {
       await deleteAllInvoices()
       setInvoices([])
       toast({ 
-        title: "Baza wyczyszczona", 
-        description: "Wszystkie rekordy zostały usunięte z pamięci lokalnej i chmury." 
+        title: "Sukces", 
+        description: "Baza danych została wyczyszczona." 
       })
     } catch (error: any) {
       console.error("Cleanup error:", error);
@@ -167,7 +167,7 @@ export default function AdminPage() {
             variant="destructive" 
             className="bg-red-600 hover:bg-red-700" 
             onClick={handleClearAll} 
-            disabled={clearing}
+            disabled={clearing || loading}
           >
             {clearing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
             Wyczyść całą bazę
@@ -193,7 +193,7 @@ export default function AdminPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {loading && invoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary opacity-50" />
@@ -234,7 +234,7 @@ export default function AdminPage() {
                           className="h-8" 
                         />
                       ) : (
-                        inv.totalGross?.toLocaleString()
+                        inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-2">

@@ -35,36 +35,39 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
+    // Pomocnicza funkcja do pobierania wartości taga bez względu na prefiks (ns0:, itp.)
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
-      // Spróbuj z przestrzenią nazw, potem bez
-      const el = parent.getElementsByTagNameNS("*", tagName)[0] || 
-                 parent.getElementsByTagName(tagName)[0];
-      return el ? el.textContent?.trim() || "" : "";
+      // Szukamy elementu o danej nazwie lokalnej
+      const elements = parent.querySelectorAll(`*`);
+      for (let i = 0; i < elements.length; i++) {
+        if (elements[i].localName === tagName) {
+          return elements[i].textContent?.trim() || "";
+        }
+      }
+      return "";
     };
 
+    // Pomocnicza funkcja do pobierania listy elementów o danej nazwie lokalnej
     const getEls = (tagName: string, parent: Element | Document = xmlDoc) => {
-      const els = parent.getElementsByTagNameNS("*", tagName);
-      if (els.length > 0) return Array.from(els);
-      return Array.from(parent.getElementsByTagName(tagName));
+      const all = parent.querySelectorAll(`*`);
+      const result: Element[] = [];
+      all.forEach(el => {
+        if (el.localName === tagName) result.push(el);
+      });
+      return result;
     };
 
-    const getAddress = (parent: Element | null) => {
-      if (!parent) return "";
-      const adr = parent.getElementsByTagNameNS("*", "Adres")[0] || parent.getElementsByTagName("Adres")[0];
-      if (!adr) return "";
-      const l1 = getVal("AdresL1", adr);
-      const l2 = getVal("AdresL2", adr);
-      return `${l1}, ${l2}`;
+    const getAddress = (tagName: string) => {
+      const podmioty = getEls(tagName);
+      if (podmioty.length === 0) return "";
+      const podmiot = podmioty[0];
+      const l1 = getVal("AdresL1", podmiot);
+      const l2 = getVal("AdresL2", podmiot);
+      return l1 && l2 ? `${l1}, ${l2}` : (l1 || l2 || "");
     };
 
-    const podmiot1 = xmlDoc.getElementsByTagNameNS("*", "Podmiot1")[0] || xmlDoc.getElementsByTagName("Podmiot1")[0];
-    const podmiot2 = xmlDoc.getElementsByTagNameNS("*", "Podmiot2")[0] || xmlDoc.getElementsByTagName("Podmiot2")[0];
-
-    // Pobieranie sekcji Fa dla precyzyjniejszego wyszukiwania wierszy
-    const faSection = xmlDoc.getElementsByTagNameNS("*", "Fa")[0] || xmlDoc.getElementsByTagName("Fa")[0];
-    
     // Szukamy wierszy faktury (FaWiersz)
-    const wierszeEls = getEls("FaWiersz", faSection || xmlDoc);
+    const wierszeEls = getEls("FaWiersz");
     
     const items: InvoiceItem[] = wierszeEls.map(w => {
       const qStr = getVal("P_8B", w).replace(",", ".");
@@ -73,7 +76,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       const vStr = getVal("P_11Vat", w).replace(",", ".");
       
       return {
-        description: getVal("P_7", w),
+        description: getVal("P_7", w) || "Towar/Usługa",
         quantity: parseFloat(qStr) || 0,
         unitPrice: parseFloat(pStr) || 0,
         netValue: parseFloat(nStr) || 0,
@@ -82,36 +85,29 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       };
     });
 
-    const p13_1 = parseFloat(getVal("P_13_1").replace(",", ".")) || 0;
-    const p13_2 = parseFloat(getVal("P_13_2").replace(",", ".")) || 0;
-    const p13_3 = parseFloat(getVal("P_13_3").replace(",", ".")) || 0;
-    
-    const p14_1 = parseFloat(getVal("P_14_1").replace(",", ".")) || 0;
-    const p14_2 = parseFloat(getVal("P_14_2").replace(",", ".")) || 0;
-    const p14_3 = parseFloat(getVal("P_14_3").replace(",", ".")) || 0;
-
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
-    const sumNet = p13_1 + p13_2 + p13_3;
-    const sumVat = p14_1 + p14_2 + p14_3;
+    const currency = getVal("KodWaluty") || "PLN";
 
-    // Jeżeli nie ma sum w polach P_13_x, spróbuj policzyć z wierszy
-    const calculatedNet = items.reduce((sum, item) => sum + item.netValue, 0);
-    const calculatedVat = items.reduce((sum, item) => sum + item.vatValue, 0);
+    // Wyciąganie danych podmiotów
+    const sellerName = getVal("Nazwa", getEls("Podmiot1")[0] || xmlDoc);
+    const sellerNip = getVal("NIP", getEls("Podmiot1")[0] || xmlDoc);
+    const buyerName = getVal("Nazwa", getEls("Podmiot2")[0] || xmlDoc);
+    const buyerNip = getVal("NIP", getEls("Podmiot2")[0] || xmlDoc);
 
     const data: ParsedKSeF = {
       invoiceNumber: getVal("P_2"),
       invoiceDate: getVal("P_1"),
       saleDate: getVal("P_6") || getVal("P_1"),
-      sellerName: podmiot1 ? getVal("Nazwa", podmiot1) : "",
-      sellerNip: podmiot1 ? getVal("NIP", podmiot1) : "",
-      sellerAddress: getAddress(podmiot1 as Element),
-      buyerName: podmiot2 ? getVal("Nazwa", podmiot2) : "",
-      buyerNip: podmiot2 ? getVal("NIP", podmiot2) : "",
-      buyerAddress: getAddress(podmiot2 as Element),
-      totalNet: sumNet || calculatedNet || (gross - (sumVat || calculatedVat)),
-      totalVat: sumVat || calculatedVat,
-      totalGross: gross || (calculatedNet + calculatedVat),
-      currency: getVal("KodWaluty") || "PLN",
+      sellerName,
+      sellerNip,
+      sellerAddress: getAddress("Podmiot1"),
+      buyerName,
+      buyerNip,
+      buyerAddress: getAddress("Podmiot2"),
+      totalNet: items.reduce((sum, item) => sum + item.netValue, 0) || gross,
+      totalVat: items.reduce((sum, item) => sum + item.vatValue, 0),
+      totalGross: gross,
+      currency,
       items
     };
 
