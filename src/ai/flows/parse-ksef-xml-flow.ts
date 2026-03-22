@@ -1,60 +1,76 @@
 'use server';
 /**
- * @fileOverview Genkit flow for parsing KSeF FA(3) XML content into structured JSON.
+ * @fileOverview Szybki parser XML dla KSeF FA(3) - metoda hybrydowa (Regex + AI fallback).
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-const KSeFParseInputSchema = z.object({
-  xmlContent: z.string().describe('Raw XML content of the KSeF invoice.'),
-});
-
 const KSeFParseOutputSchema = z.object({
-  invoiceNumber: z.string().describe('P_2 field: Invoice number.'),
-  invoiceDate: z.string().describe('P_1 field: Issue date.'),
-  sellerName: z.string().describe('Podmiot1/Nazwa: Seller company name.'),
-  sellerNip: z.string().describe('Podmiot1/NIP: Seller tax ID.'),
-  buyerName: z.string().describe('Podmiot2/Nazwa: Buyer company name.'),
-  buyerNip: z.string().describe('Podmiot2/NIP: Buyer tax ID.'),
-  totalNet: z.number().describe('Sum of net amounts (e.g., P_13_1 + P_13_3).'),
-  totalVat: z.number().describe('Sum of VAT amounts (e.g., P_14_1 + P_14_3).'),
-  totalGross: z.number().describe('P_15 field: Total gross amount.'),
-  currency: z.string().default('PLN').describe('KodWaluty field: Currency (e.g., PLN).'),
-  items: z.array(z.object({
-    description: z.string().describe('P_7: Item description.'),
-    quantity: z.number().describe('P_8B: Quantity.'),
-    netPrice: z.number().describe('P_9A: Net unit price.'),
-    vatRate: z.string().describe('P_12: VAT rate.'),
-  })).optional(),
+  invoiceNumber: z.string(),
+  invoiceDate: z.string(),
+  sellerName: z.string(),
+  sellerNip: z.string(),
+  buyerName: z.string(),
+  buyerNip: z.string(),
+  totalGross: z.number(),
+  currency: z.string().default('PLN'),
 });
 
 export type KSeFParseOutput = z.infer<typeof KSeFParseOutputSchema>;
 
-const ksefParsePrompt = ai.definePrompt({
-  name: 'ksefParsePrompt',
-  model: 'googleai/gemini-1.5-flash',
-  input: { schema: KSeFParseInputSchema },
-  output: { schema: KSeFParseOutputSchema },
-  prompt: `You are a specialist in Polish KSeF XML (FA(3) schema). 
-  Parse the following XML content and extract all required fields. 
-  Pay close attention to namespaces (e.g., ns0:).
-  - P_1 is the issue date.
-  - P_2 is the invoice number.
-  - P_15 is the gross total.
-  - Podmiot1 is the seller, Podmiot2 is the buyer.
-  
-  XML Content:
-  {{xmlContent}}`,
-});
+/**
+ * Manualny parser XML dla KSeF - 100% stabilności dla ustrukturyzowanych danych.
+ */
+function manualParseKSeF(xml: string): KSeFParseOutput | null {
+  try {
+    const getTagValue = (tag: string, content: string) => {
+      const regex = new RegExp(`<[^>]*${tag}[^>]*>([^<]*)<`, 'i');
+      const match = content.match(regex);
+      return match ? match[1].trim() : '';
+    };
+
+    // Wyciąganie sekcji podmiotów
+    const podmiot1Match = xml.match(/<[^>]*Podmiot1[^>]*>([\s\S]*?)<\/[^>]*Podmiot1[^>]*>/i);
+    const podmiot2Match = xml.match(/<[^>]*Podmiot2[^>]*>([\s\S]*?)<\/[^>]*Podmiot2[^>]*>/i);
+    
+    const podmiot1 = podmiot1Match ? podmiot1Match[1] : '';
+    const podmiot2 = podmiot2Match ? podmiot2Match[1] : '';
+
+    const data: KSeFParseOutput = {
+      invoiceNumber: getTagValue('P_2', xml),
+      invoiceDate: getTagValue('P_1', xml),
+      sellerName: getTagValue('Nazwa', podmiot1),
+      sellerNip: getTagValue('NIP', podmiot1),
+      buyerName: getTagValue('Nazwa', podmiot2),
+      buyerNip: getTagValue('NIP', podmiot2),
+      totalGross: parseFloat(getTagValue('P_15', xml)) || 0,
+      currency: getTagValue('KodWaluty', xml) || 'PLN',
+    };
+
+    if (!data.invoiceNumber || !data.sellerName) return null;
+    return data;
+  } catch (e) {
+    console.error("Manual parse error:", e);
+    return null;
+  }
+}
 
 export async function parseKSeFXML(xmlContent: string): Promise<KSeFParseOutput> {
+  // 1. Najpierw spróbuj manualnie (szybko i za darmo)
+  const manualData = manualParseKSeF(xmlContent);
+  if (manualData) return manualData;
+
+  // 2. Jeśli manualny zawiedzie, użyj AI jako backupu
   try {
-    const { output } = await ksefParsePrompt({ xmlContent });
-    if (!output) throw new Error('AI returned empty output.');
-    return output;
-  } catch (error: any) {
+    const response = await ai.generate({
+      model: 'googleai/gemini-1.5-flash',
+      prompt: `Parse this Polish KSeF XML and return JSON with: invoiceNumber (P_2), invoiceDate (P_1), sellerName (Podmiot1/Nazwa), sellerNip (Podmiot1/NIP), buyerName (Podmiot2/Nazwa), buyerNip (Podmiot2/NIP), totalGross (P_15), currency (KodWaluty). XML: ${xmlContent}`,
+      output: { schema: KSeFParseOutputSchema }
+    });
+    return response.output!;
+  } catch (error) {
     console.error("AI Parse Error:", error);
-    throw error;
+    throw new Error("Nie udało się sparsować pliku XML żadną metodą.");
   }
 }
