@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react"
@@ -9,55 +10,81 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { 
-  MoreHorizontal, 
   FileText, 
-  FileCode, 
-  Download, 
-  Eye, 
-  Filter,
+  Search, 
   ArrowUpDown,
-  FileSearch,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download,
+  Eye,
+  Filter
 } from "lucide-react"
 import { mockInvoices } from "@/lib/mock-data"
 import { toast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 const PAGE_SIZE = 50
+
+type SortConfig = {
+  key: string;
+  direction: 'asc' | 'desc' | null;
+}
 
 export default function InvoicesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("ALL")
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'invoiceDate', direction: 'desc' })
 
+  // Filtrowanie danych
   const filteredInvoices = useMemo(() => {
     return mockInvoices.filter(inv => {
-      const matchesSearch = inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           (inv.ksefReference?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-      const matchesStatus = statusFilter === "ALL" || inv.status === statusFilter
-      return matchesSearch && matchesStatus
+      const searchStr = searchQuery.toLowerCase()
+      return (
+        inv.invoiceNumber.toLowerCase().includes(searchStr) || 
+        inv.customerName.toLowerCase().includes(searchStr) ||
+        (inv.ksefReference?.toLowerCase().includes(searchStr) ?? false)
+      )
     })
-  }, [searchQuery, statusFilter])
+  }, [searchQuery])
 
+  // Sortowanie danych
+  const sortedInvoices = useMemo(() => {
+    const items = [...filteredInvoices]
+    if (sortConfig.direction !== null) {
+      items.sort((a: any, b: any) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1
+        }
+        return 0
+      })
+    }
+    return items
+  }, [filteredInvoices, sortConfig])
+
+  // Paginacja
   const paginatedInvoices = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE
-    return filteredInvoices.slice(start, start + PAGE_SIZE)
-  }, [filteredInvoices, currentPage])
+    return sortedInvoices.slice(start, start + PAGE_SIZE)
+  }, [sortedInvoices, currentPage])
 
-  const totalPages = Math.ceil(filteredInvoices.length / PAGE_SIZE)
+  const totalPages = Math.ceil(sortedInvoices.length / PAGE_SIZE)
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' | null = 'asc'
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc'
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null
+    }
+    setSortConfig({ key, direction })
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -66,18 +93,6 @@ export default function InvoicesPage() {
       case 'DRAFT': return <Badge variant="secondary" className="border-none">Szkic</Badge>
       default: return <Badge variant="outline" className="border-none">{status}</Badge>
     }
-  }
-
-  const handleDownloadXML = (invId: string) => {
-    toast({ title: "Pobieranie XML", description: `Generowanie pliku XML dla ${invId}...` })
-  }
-
-  const handleDownloadPDF = (invId: string) => {
-    toast({ title: "Podgląd PDF", description: `Otwieranie podglądu faktury ${invId}...` })
-  }
-
-  const handleGeneratePZ = (invId: string) => {
-    toast({ title: "Generowanie PZ (TXT)", description: `Tworzenie dokumentu Potwierdzenia Odbioru dla ${invId}...` })
   }
 
   return (
@@ -89,41 +104,38 @@ export default function InvoicesPage() {
             placeholder="Szukaj po numerze, kliencie lub KSeF..." 
             className="pl-10 bg-white border-none shadow-sm"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
           />
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <Button variant="outline" className="bg-white border-none shadow-sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filtry
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="bg-white border-none shadow-sm">
-                Status: {statusFilter === "ALL" ? "Wszystkie" : statusFilter}
-              </DropdownMenuTrigger>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setStatusFilter("ALL")}>Wszystkie</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("ACCEPTED")}>Zaakceptowane</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("REJECTED")}>Odrzucone</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("DRAFT")}>Szkice</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="text-sm text-muted-foreground font-medium">
+          Znaleziono: {sortedInvoices.length} faktur
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead className="w-[180px] font-bold">Numer Faktury</TableHead>
-              <TableHead className="font-bold">Data</TableHead>
-              <TableHead className="font-bold">Klient</TableHead>
-              <TableHead className="font-bold">Kwota Netto</TableHead>
-              <TableHead className="font-bold text-right">Brutto</TableHead>
-              <TableHead className="font-bold">Status KSeF</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead onClick={() => handleSort('invoiceNumber')} className="cursor-pointer hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2">Numer <ArrowUpDown className="h-3 w-3" /></div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('invoiceDate')} className="cursor-pointer hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2">Data <ArrowUpDown className="h-3 w-3" /></div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('customerName')} className="cursor-pointer hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2">Klient <ArrowUpDown className="h-3 w-3" /></div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('totalNet')} className="cursor-pointer hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2">Netto <ArrowUpDown className="h-3 w-3" /></div>
+              </TableHead>
+              <TableHead onClick={() => handleSort('totalGross')} className="cursor-pointer hover:bg-slate-100 transition-colors text-right">
+                <div className="flex items-center justify-end gap-2">Brutto <ArrowUpDown className="h-3 w-3" /></div>
+              </TableHead>
+              <TableHead>Status KSeF</TableHead>
+              <TableHead className="w-[100px] text-center">PDF</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -137,30 +149,28 @@ export default function InvoicesPage() {
                   {inv.totalGross.toLocaleString()} {inv.currency}
                 </TableCell>
                 <TableCell>{getStatusBadge(inv.status)}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
+                <TableCell className="text-center">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10">
+                        <FileText className="h-5 w-5" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel>Akcje dokumentu</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleDownloadPDF(inv.id)}>
-                        <Eye className="mr-2 h-4 w-4 text-accent" /> Podgląd PDF
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownloadXML(inv.id)}>
-                        <FileCode className="mr-2 h-4 w-4 text-primary" /> Pobierz XML KSeF
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleGeneratePZ(inv.id)}>
-                        <FileText className="mr-2 h-4 w-4 text-blue-500" /> Generuj PZ (TXT)
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        Usuń dokument
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl h-[80vh]">
+                      <DialogHeader>
+                        <DialogTitle>Podgląd faktury: {inv.invoiceNumber}</DialogTitle>
+                      </DialogHeader>
+                      <div className="flex-1 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed">
+                        <div className="text-center space-y-2">
+                          <FileText className="h-12 w-12 text-slate-400 mx-auto" />
+                          <p className="text-slate-500">Podgląd PDF dla faktury {inv.invoiceNumber}</p>
+                          <Button variant="outline" size="sm">
+                            <Download className="h-4 w-4 mr-2" /> Pobierz plik PDF
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </TableCell>
               </TableRow>
             ))}
@@ -168,9 +178,9 @@ export default function InvoicesPage() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-between px-2">
+      <div className="flex items-center justify-between px-2 py-4">
         <p className="text-sm text-muted-foreground">
-          Pokazano {paginatedInvoices.length} z {filteredInvoices.length} rekordów
+          Strona {currentPage} z {totalPages || 1}
         </p>
         <div className="flex items-center space-x-2">
           <Button 
@@ -180,11 +190,8 @@ export default function InvoicesPage() {
             disabled={currentPage === 1}
             className="bg-white"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 mr-1" /> Poprzednia
           </Button>
-          <div className="text-sm font-medium">
-            Strona {currentPage} z {totalPages || 1}
-          </div>
           <Button 
             variant="outline" 
             size="sm" 
@@ -192,7 +199,7 @@ export default function InvoicesPage() {
             disabled={currentPage === totalPages || totalPages === 0}
             className="bg-white"
           >
-            <ChevronRight className="h-4 w-4" />
+            Następna <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       </div>

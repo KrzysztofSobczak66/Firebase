@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -11,7 +12,8 @@ import {
   Menu,
   FilePlus,
   Search,
-  Settings
+  Settings,
+  ShieldAlert
 } from "lucide-react"
 
 import { 
@@ -41,6 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: "Faktury", icon: FileText, href: "/dashboard/invoices" },
     { label: "Weryfikacja AI", icon: ShieldCheck, href: "/dashboard/ai-validator" },
     { label: "Masowy Import", icon: Upload, href: "/dashboard/admin/import" },
+    { label: "Administracja", icon: ShieldAlert, href: "/dashboard/admin" },
   ]
 
   const settingsItems = [
