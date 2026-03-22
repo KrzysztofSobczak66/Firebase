@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { 
   Table, 
   TableBody, 
@@ -20,12 +20,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Eye,
-  Filter
+  Loader2
 } from "lucide-react"
-import { mockInvoices } from "@/lib/mock-data"
 import { toast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { getAllInvoices } from "@/lib/firestore"
 
 const PAGE_SIZE = 50
 
@@ -35,21 +34,38 @@ type SortConfig = {
 }
 
 export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'invoiceDate', direction: 'desc' })
 
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await getAllInvoices()
+        setInvoices(data)
+      } catch (error) {
+        console.error("Błąd podczas pobierania faktur:", error)
+        toast({ variant: "destructive", title: "Błąd", description: "Nie udało się pobrać danych z bazy." })
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
   // Filtrowanie danych
   const filteredInvoices = useMemo(() => {
-    return mockInvoices.filter(inv => {
+    return invoices.filter(inv => {
       const searchStr = searchQuery.toLowerCase()
       return (
         inv.invoiceNumber.toLowerCase().includes(searchStr) || 
-        inv.customerName.toLowerCase().includes(searchStr) ||
-        (inv.ksefReference?.toLowerCase().includes(searchStr) ?? false)
+        inv.sellerName?.toLowerCase().includes(searchStr) ||
+        inv.buyerName?.toLowerCase().includes(searchStr)
       )
     })
-  }, [searchQuery])
+  }, [searchQuery, invoices])
 
   // Sortowanie danych
   const sortedInvoices = useMemo(() => {
@@ -86,13 +102,13 @@ export default function InvoicesPage() {
     setSortConfig({ key, direction })
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACCEPTED': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Zaakceptowana</Badge>
-      case 'REJECTED': return <Badge variant="destructive" className="border-none">Odrzucona</Badge>
-      case 'DRAFT': return <Badge variant="secondary" className="border-none">Szkic</Badge>
-      default: return <Badge variant="outline" className="border-none">{status}</Badge>
-    }
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <p className="text-muted-foreground animate-pulse">Ładowanie bazy faktur...</p>
+      </div>
+    )
   }
 
   return (
@@ -101,7 +117,7 @@ export default function InvoicesPage() {
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Szukaj po numerze, kliencie lub KSeF..." 
+            placeholder="Szukaj po numerze lub kontrahencie..." 
             className="pl-10 bg-white border-none shadow-sm"
             value={searchQuery}
             onChange={(e) => {
@@ -111,7 +127,7 @@ export default function InvoicesPage() {
           />
         </div>
         <div className="text-sm text-muted-foreground font-medium">
-          Znaleziono: {sortedInvoices.length} faktur
+          Łącznie w bazie: {invoices.length} dokumentów
         </div>
       </div>
 
@@ -125,8 +141,8 @@ export default function InvoicesPage() {
               <TableHead onClick={() => handleSort('invoiceDate')} className="cursor-pointer hover:bg-slate-100 transition-colors">
                 <div className="flex items-center gap-2">Data <ArrowUpDown className="h-3 w-3" /></div>
               </TableHead>
-              <TableHead onClick={() => handleSort('customerName')} className="cursor-pointer hover:bg-slate-100 transition-colors">
-                <div className="flex items-center gap-2">Klient <ArrowUpDown className="h-3 w-3" /></div>
+              <TableHead onClick={() => handleSort('sellerName')} className="cursor-pointer hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2">Sprzedawca <ArrowUpDown className="h-3 w-3" /></div>
               </TableHead>
               <TableHead onClick={() => handleSort('totalNet')} className="cursor-pointer hover:bg-slate-100 transition-colors">
                 <div className="flex items-center gap-2">Netto <ArrowUpDown className="h-3 w-3" /></div>
@@ -134,21 +150,19 @@ export default function InvoicesPage() {
               <TableHead onClick={() => handleSort('totalGross')} className="cursor-pointer hover:bg-slate-100 transition-colors text-right">
                 <div className="flex items-center justify-end gap-2">Brutto <ArrowUpDown className="h-3 w-3" /></div>
               </TableHead>
-              <TableHead>Status KSeF</TableHead>
               <TableHead className="w-[100px] text-center">PDF</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedInvoices.map((inv) => (
+            {paginatedInvoices.length > 0 ? paginatedInvoices.map((inv) => (
               <TableRow key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <TableCell className="font-medium text-primary">{inv.invoiceNumber}</TableCell>
                 <TableCell>{inv.invoiceDate}</TableCell>
-                <TableCell>{inv.customerName}</TableCell>
-                <TableCell>{inv.totalNet.toLocaleString()} {inv.currency}</TableCell>
+                <TableCell>{inv.sellerName}</TableCell>
+                <TableCell>{inv.totalNet?.toLocaleString()} {inv.currency}</TableCell>
                 <TableCell className="text-right font-semibold">
-                  {inv.totalGross.toLocaleString()} {inv.currency}
+                  {inv.totalGross?.toLocaleString()} {inv.currency}
                 </TableCell>
-                <TableCell>{getStatusBadge(inv.status)}</TableCell>
                 <TableCell className="text-center">
                   <Dialog>
                     <DialogTrigger asChild>
@@ -173,36 +187,44 @@ export default function InvoicesPage() {
                   </Dialog>
                 </TableCell>
               </TableRow>
-            ))}
+            )) : (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  Brak faktur w bazie. Przejdź do zakładki "Masowy Import", aby dodać dokumenty.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
 
-      <div className="flex items-center justify-between px-2 py-4">
-        <p className="text-sm text-muted-foreground">
-          Strona {currentPage} z {totalPages || 1}
-        </p>
-        <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="bg-white"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" /> Poprzednia
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages || totalPages === 0}
-            className="bg-white"
-          >
-            Następna <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-4">
+          <p className="text-sm text-muted-foreground">
+            Strona {currentPage} z {totalPages}
+          </p>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="bg-white"
+            >
+              Poprzednia
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="bg-white"
+            >
+              Następna
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
