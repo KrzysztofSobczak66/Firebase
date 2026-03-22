@@ -1,6 +1,7 @@
 /**
  * @fileOverview Zaawansowany, kliencki parser XML dla KSeF FA(3).
  * Wyciąga pełne dane faktury, w tym wszystkie pozycje towarowe i dane adresowe.
+ * Zoptymalizowany pod kątem obsługi przestrzeni nazw (namespaces).
  */
 
 export interface InvoiceItem {
@@ -34,10 +35,17 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
+    // Pomocnik do pobierania wartości tagu ignorując prefixy (ns0: itp)
     const getVal = (tagName: string, parent: Element | Document = xmlDoc) => {
-      // Szukamy tagu bez względu na przestrzeń nazw (prefix:)
       const el = parent.getElementsByTagNameNS("*", tagName)[0] || parent.getElementsByTagName(tagName)[0];
       return el ? el.textContent?.trim() || "" : "";
+    };
+
+    // Pomocnik do pobierania wszystkich elementów o danej nazwie
+    const getEls = (tagName: string, parent: Element | Document = xmlDoc) => {
+      const els = parent.getElementsByTagNameNS("*", tagName);
+      if (els.length > 0) return Array.from(els);
+      return Array.from(parent.getElementsByTagName(tagName));
     };
 
     const getAddress = (parent: Element | null) => {
@@ -54,24 +62,35 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     const podmiot2 = xmlDoc.getElementsByTagNameNS("*", "Podmiot2")[0] || xmlDoc.getElementsByTagName("Podmiot2")[0];
 
     // Parsowanie pozycji faktury (FaWiersz)
-    const wierszeEls = Array.from(xmlDoc.getElementsByTagNameNS("*", "FaWiersz") || xmlDoc.getElementsByTagName("FaWiersz"));
-    const items: InvoiceItem[] = wierszeEls.map(w => ({
-      description: getVal("P_7", w),
-      quantity: parseFloat(getVal("P_8B", w).replace(",", ".")) || 0,
-      unitPrice: parseFloat(getVal("P_9A", w).replace(",", ".")) || 0,
-      netValue: parseFloat(getVal("P_11", w).replace(",", ".")) || 0,
-      vatValue: parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0,
-      vatRate: getVal("P_12", w) + "%"
-    }));
+    const wierszeEls = getEls("FaWiersz");
+    const items: InvoiceItem[] = wierszeEls.map(w => {
+      const qty = parseFloat(getVal("P_8B", w).replace(",", ".")) || 0;
+      const price = parseFloat(getVal("P_9A", w).replace(",", ".")) || 0;
+      const net = parseFloat(getVal("P_11", w).replace(",", ".")) || 0;
+      const vatV = parseFloat(getVal("P_11Vat", w).replace(",", ".")) || 0;
+      
+      return {
+        description: getVal("P_7", w),
+        quantity: qty,
+        unitPrice: price,
+        netValue: net,
+        vatValue: vatV,
+        vatRate: getVal("P_12", w) + "%"
+      };
+    });
 
-    // Sumowanie kwot (obsługa wielu stawek VAT)
-    const sumNet = parseFloat(getVal("P_13_1").replace(",", ".")) || 0 + 
-                   parseFloat(getVal("P_13_2").replace(",", ".")) || 0 + 
-                   parseFloat(getVal("P_13_3").replace(",", ".")) || 0;
+    // Sumowanie kwot (obsługa wielu stawek VAT) - poprawiona kolejność operacji
+    const p13_1 = parseFloat(getVal("P_13_1").replace(",", ".")) || 0;
+    const p13_2 = parseFloat(getVal("P_13_2").replace(",", ".")) || 0;
+    const p13_3 = parseFloat(getVal("P_13_3").replace(",", ".")) || 0;
+    const sumNet = p13_1 + p13_2 + p13_3;
                    
-    const sumVat = parseFloat(getVal("P_14_1").replace(",", ".")) || 0 + 
-                   parseFloat(getVal("P_14_2").replace(",", ".")) || 0 + 
-                   parseFloat(getVal("P_14_3").replace(",", ".")) || 0;
+    const p14_1 = parseFloat(getVal("P_14_1").replace(",", ".")) || 0;
+    const p14_2 = parseFloat(getVal("P_14_2").replace(",", ".")) || 0;
+    const p14_3 = parseFloat(getVal("P_14_3").replace(",", ".")) || 0;
+    const sumVat = p14_1 + p14_2 + p14_3;
+
+    const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
 
     const data: ParsedKSeF = {
       invoiceNumber: getVal("P_2"),
@@ -83,9 +102,9 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       buyerName: podmiot2 ? getVal("Nazwa", podmiot2) : "",
       buyerNip: podmiot2 ? getVal("NIP", podmiot2) : "",
       buyerAddress: getAddress(podmiot2 as Element),
-      totalNet: sumNet || (parseFloat(getVal("P_15").replace(",", ".")) - sumVat),
+      totalNet: sumNet || (gross - sumVat),
       totalVat: sumVat,
-      totalGross: parseFloat(getVal("P_15").replace(",", ".")) || 0,
+      totalGross: gross,
       currency: getVal("KodWaluty") || "PLN",
       items
     };
