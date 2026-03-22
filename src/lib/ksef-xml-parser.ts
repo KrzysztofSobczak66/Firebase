@@ -35,6 +35,8 @@ export interface ParsedKSeF {
   saleDate: string;
   dueDate: string;
   currency: string;
+  documentType: string;
+  documentTypeCode: string;
   seller: PartyData;
   buyer: PartyData;
   recipient?: PartyData;
@@ -59,6 +61,18 @@ export interface ParsedKSeF {
   buyerAddress: string;
 }
 
+const mapDocumentType = (code: string): string => {
+  const types: Record<string, string> = {
+    'VAT': 'Faktura VAT',
+    'KOR': 'Faktura Korygująca',
+    'ZAL': 'Faktura Zaliczkowa',
+    'ROZ': 'Faktura Rozliczeniowa',
+    'KZAL': 'Korekta Faktury Zaliczkowej',
+    'UPR': 'Faktura Uproszczona'
+  };
+  return types[code.toUpperCase()] || `Faktura (${code})`;
+};
+
 export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
   try {
     const parser = new DOMParser();
@@ -82,8 +96,9 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
     };
 
     const parseParty = (tagName: string): PartyData | undefined => {
-      const el = getEls(tagName)[0];
-      if (!el) return undefined;
+      const els = getEls(tagName);
+      if (els.length === 0) return undefined;
+      const el = els[0];
       return {
         name: getVal("Nazwa", el),
         nip: getVal("NIP", el),
@@ -124,6 +139,7 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       reason: getVal("Powod", o)
     }));
 
+    const typeCode = getVal("RodzajFaktury") || "VAT";
     const gross = parseFloat(getVal("P_15").replace(",", ".")) || 0;
     const amountToPay = parseFloat(getVal("DoZaplaty").replace(",", ".")) || gross;
 
@@ -134,6 +150,8 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       saleDate: getVal("P_6") || getVal("P_1"),
       dueDate: getVal("Termin"),
       currency: getVal("KodWaluty") || "PLN",
+      documentTypeCode: typeCode,
+      documentType: mapDocumentType(typeCode),
       seller,
       buyer,
       recipient,
@@ -150,12 +168,12 @@ export function parseKSeFXMLClient(xmlString: string): ParsedKSeF | null {
       paymentMethod: getVal("FormaPlatnosci"),
       paymentTermDescription: `${getVal("Ilosc")} ${getVal("Jednostka")}`,
       // Legacy mapping
-      sellerName: seller.name,
-      sellerNip: seller.nip,
-      sellerAddress: `${seller.addressL1}, ${seller.addressL2}`,
-      buyerName: buyer.name,
-      buyerNip: buyer.nip,
-      buyerAddress: `${buyer.addressL1}, ${buyer.addressL2}`
+      sellerName: seller?.name || "Nieznany",
+      sellerNip: seller?.nip || "",
+      sellerAddress: seller ? `${seller.addressL1}, ${seller.addressL2}` : "",
+      buyerName: buyer?.name || "Nieznany",
+      buyerNip: buyer?.nip || "",
+      buyerAddress: buyer ? `${buyer.addressL1}, ${buyer.addressL2}` : ""
     };
   } catch (e) {
     console.error("Critical XML Parse Error:", e);

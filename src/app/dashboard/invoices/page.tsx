@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { getAllInvoices } from "@/lib/firestore"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import html2canvas from "html2canvas"
 import jsPDF from "jspdf"
 
@@ -46,6 +47,7 @@ export default function InvoicesPage() {
   const [endDate, setEndDate] = useState("")
   const [sellerFilter, setSellerFilter] = useState("")
   const [buyerFilter, setBuyerFilter] = useState("")
+  const [typeFilter, setTypeFilter] = useState("ALL")
   
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc' | null}>({ 
     key: 'invoiceDate', 
@@ -75,7 +77,7 @@ export default function InvoicesPage() {
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 1200 // Zapewnia stałą szerokość podczas renderingu
+        windowWidth: 1200
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -104,13 +106,15 @@ export default function InvoicesPage() {
         (inv.buyerName || "").toLowerCase().includes(buyerFilter.toLowerCase()) ||
         (inv.buyerNip || "").includes(buyerFilter)
 
+      const matchesType = typeFilter === "ALL" || inv.documentTypeCode === typeFilter;
+
       const invDate = inv.invoiceDate || "";
       const matchesStartDate = startDate === "" || invDate >= startDate;
       const matchesEndDate = endDate === "" || invDate <= endDate;
 
-      return matchesSearch && matchesSeller && matchesBuyer && matchesStartDate && matchesEndDate;
+      return matchesSearch && matchesSeller && matchesBuyer && matchesStartDate && matchesEndDate && matchesType;
     })
-  }, [searchQuery, sellerFilter, buyerFilter, startDate, endDate, invoices])
+  }, [searchQuery, sellerFilter, buyerFilter, startDate, endDate, typeFilter, invoices])
 
   const sortedInvoices = useMemo(() => {
     const items = [...filteredInvoices]
@@ -145,6 +149,7 @@ export default function InvoicesPage() {
     setEndDate("")
     setSellerFilter("")
     setBuyerFilter("")
+    setTypeFilter("ALL")
     setCurrentPage(1)
   }
 
@@ -165,7 +170,7 @@ export default function InvoicesPage() {
             <Filter className="h-4 w-4" />
             Filtrowanie zaawansowane
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Numer Faktury</label>
               <Input 
@@ -183,6 +188,20 @@ export default function InvoicesPage() {
                 onChange={(e) => setSellerFilter(e.target.value)}
                 className="h-9"
               />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Typ Dokumentu</label>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Wszystkie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Wszystkie</SelectItem>
+                  <SelectItem value="VAT">Faktura VAT</SelectItem>
+                  <SelectItem value="KOR">Korekta</SelectItem>
+                  <SelectItem value="ZAL">Zaliczkowa</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Nabywca / NIP</label>
@@ -218,6 +237,9 @@ export default function InvoicesPage() {
               <TableHead onClick={() => handleSort('invoiceNumber')} className="cursor-pointer group whitespace-nowrap">
                 Numer Faktury <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
               </TableHead>
+              <TableHead onClick={() => handleSort('documentType')} className="cursor-pointer group">
+                Typ <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
+              </TableHead>
               <TableHead onClick={() => handleSort('invoiceDate')} className="cursor-pointer group">
                 Data Wyst. <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-50" />
               </TableHead>
@@ -232,11 +254,16 @@ export default function InvoicesPage() {
           <TableBody>
             {paginatedInvoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Brak faktur spełniających kryteria.</TableCell>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Brak faktur spełniających kryteria.</TableCell>
               </TableRow>
             ) : paginatedInvoices.map((inv) => (
               <TableRow key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <TableCell className="font-bold text-primary">{inv.invoiceNumber}</TableCell>
+                <TableCell>
+                  <Badge variant={inv.documentTypeCode === 'KOR' ? 'destructive' : 'outline'} className="text-[9px] px-1.5 py-0">
+                    {inv.documentType || 'Faktura VAT'}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-xs">{inv.invoiceDate}</TableCell>
                 <TableCell>
                   <div className="text-[10px] leading-tight">
@@ -284,7 +311,9 @@ export default function InvoicesPage() {
                           {/* Header Sekcja 1 */}
                           <div className="flex justify-between items-start border-b-8 border-primary pb-8 mb-10">
                             <div>
-                              <h1 className="text-5xl font-black text-primary tracking-tighter mb-2">FAKTURA VAT</h1>
+                              <h1 className="text-5xl font-black text-primary tracking-tighter mb-2 uppercase">
+                                {inv.documentTypeCode === 'KOR' ? 'FAKTURA KORYGUJĄCA' : (inv.documentType?.toUpperCase() || 'FAKTURA VAT')}
+                              </h1>
                               <div className="bg-slate-900 text-white px-3 py-1 inline-block rounded text-sm font-bold tracking-widest uppercase">
                                 Oryginał
                               </div>
@@ -299,7 +328,7 @@ export default function InvoicesPage() {
                             </div>
                           </div>
 
-                          {/* Podmioty - Grid 3 kolumny jeśli Podmiot 3 istnieje */}
+                          {/* Podmioty */}
                           <div className={`grid ${inv.recipient?.name ? 'grid-cols-3' : 'grid-cols-2'} gap-6 mb-12`}>
                             {/* Sprzedawca */}
                             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 h-full">
