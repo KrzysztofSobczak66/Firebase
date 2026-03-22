@@ -60,40 +60,36 @@ export default function AdminPage() {
   }
 
   const handleDelete = async (id: string) => {
-    console.log("Wywołano usuwanie dla ID:", id);
-    if (!window.confirm("Czy na pewno chcesz usunąć tę fakturę?")) return
-    
+    console.log("Próba usunięcia rekordu o ID:", id);
     setLoading(true)
     try {
       await deleteInvoice(id)
       setInvoices(prev => prev.filter(inv => inv.id !== id))
-      toast({ title: "Usunięto", description: "Faktura została usunięta." })
+      toast({ title: "Usunięto", description: "Dokument został usunięty pomyślnie." })
     } catch (error: any) {
       console.error("Błąd podczas usuwania:", error);
-      toast({ variant: "destructive", title: "Błąd", description: "Nie udało się usunąć dokumentu." })
+      toast({ variant: "destructive", title: "Błąd", description: "Wystąpił błąd przy usuwaniu." })
     } finally {
       setLoading(false)
     }
   }
 
   const handleClearAll = async () => {
-    console.log("Wywołano czyszczenie całej bazy");
-    if (!window.confirm("OSTRZEŻENIE: Czy na pewno chcesz USUNĄĆ WSZYSTKIE faktury z bazy?")) return
-    
+    console.log("Rozpoczynanie czyszczenia całej bazy...");
     setClearing(true)
     try {
       await deleteAllInvoices()
       setInvoices([])
       toast({ 
         title: "Baza wyczyszczona", 
-        description: "Wszystkie dokumenty zostały usunięte pomyślnie." 
+        description: "Wszystkie rekordy zostały usunięte z pamięci i Firestore." 
       })
     } catch (error: any) {
-      console.error("Błąd czyszczenia bazy:", error);
+      console.error("Krytyczny błąd czyszczenia bazy:", error);
       toast({ 
         variant: "destructive", 
-        title: "Błąd", 
-        description: "Wystąpił problem podczas usuwania danych." 
+        title: "Błąd czyszczenia", 
+        description: "Nie udało się wyczyścić bazy danych." 
       })
     } finally {
       setClearing(false)
@@ -159,21 +155,21 @@ export default function AdminPage() {
             <ShieldAlert className="h-6 w-6 text-destructive" />
             Zarządzanie Bazą Danych
           </h2>
-          <p className="text-muted-foreground">Usuwanie i edycja faktur z bazy danych.</p>
+          <p className="text-muted-foreground">Usuwanie i edycja rekordów.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchInvoices} disabled={loading || clearing}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Odśwież
+            Odśwież listę
           </Button>
           <Button 
             variant="destructive" 
             className="bg-red-600 hover:bg-red-700" 
-            onClick={() => handleClearAll()} 
+            onClick={handleClearAll} 
             disabled={clearing || loading}
           >
             {clearing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
-            Wyczyść całą bazę
+            Wyczyść wszystko
           </Button>
           <Button variant="secondary" onClick={() => setIsAuthenticated(false)}>Wyloguj</Button>
         </div>
@@ -181,8 +177,7 @@ export default function AdminPage() {
 
       <Card className="border-none shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Wszystkie dokumenty ({invoices.length})</CardTitle>
-          <CardDescription>Edytuj lub usuwaj pojedyncze rekordy z bazy danych.</CardDescription>
+          <CardTitle className="text-lg">Dokumenty w systemie ({invoices.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -205,71 +200,23 @@ export default function AdminPage() {
               ) : (
                 invoices.map((inv) => (
                   <TableRow key={inv.id} className="hover:bg-slate-50">
-                    <TableCell>
-                      {editingId === inv.id ? (
-                        <Input 
-                          value={editForm.invoiceNumber} 
-                          onChange={(e) => setEditForm({...editForm, invoiceNumber: e.target.value})}
-                          className="h-8" 
-                        />
-                      ) : (
-                        inv.invoiceNumber
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === inv.id ? (
-                        <Input 
-                          value={editForm.sellerName} 
-                          onChange={(e) => setEditForm({...editForm, sellerName: e.target.value})}
-                          className="h-8" 
-                        />
-                      ) : (
-                        inv.sellerName || inv.seller?.name
-                      )}
-                    </TableCell>
+                    <TableCell>{inv.invoiceNumber}</TableCell>
+                    <TableCell>{inv.sellerName || inv.seller?.name}</TableCell>
                     <TableCell>{inv.invoiceDate}</TableCell>
-                    <TableCell>
-                      {editingId === inv.id ? (
-                        <Input 
-                          type="number"
-                          value={editForm.totalGross} 
-                          onChange={(e) => setEditForm({...editForm, totalGross: parseFloat(e.target.value)})}
-                          className="h-8" 
-                        />
-                      ) : (
-                        inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })
-                      )}
-                    </TableCell>
+                    <TableCell>{inv.totalGross?.toLocaleString('pl-PL', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right space-x-2">
-                      {editingId === inv.id ? (
-                        <>
-                          <Button size="sm" variant="ghost" className="text-green-600" onClick={() => handleSave(inv.id)}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button size="sm" variant="ghost" className="text-blue-600" onClick={() => startEdit(inv)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(inv.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="text-destructive" 
+                        onClick={() => handleDelete(inv.id)}
+                        disabled={loading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
-              )}
-              {!loading && invoices.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                    Baza jest pusta.
-                  </TableCell>
-                </TableRow>
               )}
             </TableBody>
           </Table>
