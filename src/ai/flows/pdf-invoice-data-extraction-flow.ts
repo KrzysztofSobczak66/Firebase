@@ -6,17 +6,9 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const AddressSchema = z.object({
-  street: z.string().describe('Street and building number.'),
-  city: z.string().describe('City.'),
-  postalCode: z.string().describe('Postal code.'),
-  country: z.string().describe('Country.'),
-});
-
 const CompanyDetailsSchema = z.object({
   name: z.string().describe('Company name.'),
   nip: z.string().optional().describe('Tax Identification Number (NIP).'),
-  address: AddressSchema.optional().describe('Company address.'),
 });
 
 const PdfInvoiceDataExtractionInputSchema = z.object({
@@ -27,10 +19,7 @@ const PdfInvoiceDataExtractionOutputSchema = z.object({
   invoiceNumber: z.string().describe('Invoice number.'),
   invoiceDate: z.string().describe('YYYY-MM-DD.'),
   seller: CompanyDetailsSchema.describe('Seller details.'),
-  totalNet: z.number().describe('Total net.'),
   totalGross: z.number().describe('Total gross.'),
-  totalVat: z.number().describe('Total VAT.'),
-  currency: z.string().optional().describe('Currency.'),
 });
 
 export type PdfInvoiceDataExtractionOutput = z.infer<typeof PdfInvoiceDataExtractionOutputSchema>;
